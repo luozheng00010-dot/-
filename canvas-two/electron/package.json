@@ -1,0 +1,52 @@
+{
+    "name": "infinite-canvas-desktop",
+    "version": "0.1.0",
+    "private": true,
+    "description": "无限画布 Windows 客户端壳（Electron）",
+    "main": "main.cjs",
+    "scripts": {
+        "dev": "electron .",
+        "start": "electron .",
+        "pack": "electron-builder --dir",
+        "dist": "electron-builder"
+    },
+    "devDependencies": {
+        "electron": "^38.2.2",
+        "electron-builder": "^26.0.12"
+    },
+    "build": {
+        "appId": "com.local.infinite-canvas",
+        "productName": "无限画布",
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "main.cjs"
+        ],
+        "extraResources": [
+            {
+                "from": "../web/dist",
+                "to": "web/dist"
+            },
+            {
+                "from": "../server/dist",
+                "to": "server/dist"
+            },
+            {
+                "from": "../server/prisma",
+                "to": "server/prisma"
+            },
+            {
+                "from": "../server/.env",
+                "to": "server/.env"
+            },
+            {
+                "from": "../server/node_modules",
+                "to": "server/node_modules"
+            }
+        ],
+        "win": {
+            "target": "nsis"
+        }
+    }
+}

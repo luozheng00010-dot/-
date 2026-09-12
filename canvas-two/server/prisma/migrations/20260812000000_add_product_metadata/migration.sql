@@ -1,0 +1,4 @@
+ALTER TABLE "products"
+ADD COLUMN "brand" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "product_type" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "selling_points" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

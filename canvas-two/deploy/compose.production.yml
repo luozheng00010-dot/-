@@ -1,0 +1,85 @@
+name: canvas-two
+
+services:
+  canvas-api:
+    image: canvas-two-api:${APP_VERSION:-latest}
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://canvas_two:${CANVAS_DATABASE_PASSWORD}@postgres:5432/canvas_two?schema=public
+      SESSION_SECRET: ${CANVAS_SESSION_SECRET}
+      CHANNEL_ENCRYPTION_KEY: ${CANVAS_CHANNEL_ENCRYPTION_KEY}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${CANVAS_MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${CANVAS_MINIO_SECRET_KEY}
+      MINIO_BUCKET: canvas-two
+      PUBLIC_BASE_PATH: /canvas
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    networks: [shared]
+
+  canvas-worker:
+    image: canvas-two-api:${APP_VERSION:-latest}
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://canvas_two:${CANVAS_DATABASE_PASSWORD}@postgres:5432/canvas_two?schema=public
+      SESSION_SECRET: ${CANVAS_SESSION_SECRET}
+      CHANNEL_ENCRYPTION_KEY: ${CANVAS_CHANNEL_ENCRYPTION_KEY}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${CANVAS_MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${CANVAS_MINIO_SECRET_KEY}
+      MINIO_BUCKET: canvas-two
+      PUBLIC_BASE_PATH: /canvas
+      WORKER_PORT: 3002
+      IMAGE_WORKER_CONCURRENCY: ${IMAGE_WORKER_CONCURRENCY:-8}
+      WORKER_PROXY_URL: ${WORKER_PROXY_URL:-}
+    depends_on:
+      canvas-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks: [shared]
+
+  canvas-app:
+    image: canvas-two-app:${APP_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE: /canvas/
+    environment:
+      ANALYTICS_GA4_ID: ${ANALYTICS_GA4_ID:-}
+      ANALYTICS_BAIDU_ID: ${ANALYTICS_BAIDU_ID:-}
+    depends_on:
+      canvas-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [shared]
+
+networks:
+  shared:
+    external: true
+    name: feishu-image-commercial_backend

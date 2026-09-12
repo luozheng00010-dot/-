@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: canvas
+      POSTGRES_USER: canvas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-canvas-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canvas -d canvas"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-canvas-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-canvas-minio-change-me}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://canvas:${POSTGRES_PASSWORD:-canvas-change-me}@postgres:5432/canvas?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:-replace-this-session-secret-before-production}
+      CHANNEL_ENCRYPTION_KEY: ${CHANNEL_ENCRYPTION_KEY:-replace-this-channel-key-before-production}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-canvas-minio}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-canvas-minio-change-me}
+      MINIO_BUCKET: infinite-canvas
+      PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - canvas-api
+
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://canvas:${POSTGRES_PASSWORD:-canvas-change-me}@postgres:5432/canvas?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:-replace-this-session-secret-before-production}
+      CHANNEL_ENCRYPTION_KEY: ${CHANNEL_ENCRYPTION_KEY:-replace-this-channel-key-before-production}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-canvas-minio}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-canvas-minio-change-me}
+      MINIO_BUCKET: infinite-canvas
+      PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-}
+      WORKER_PORT: 3002
+      IMAGE_WORKER_CONCURRENCY: ${IMAGE_WORKER_CONCURRENCY:-8}
+      WORKER_PROXY_URL: ${WORKER_PROXY_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      ANALYTICS_GA4_ID: ${ANALYTICS_GA4_ID:-}
+      ANALYTICS_BAIDU_ID: ${ANALYTICS_BAIDU_ID:-}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:
