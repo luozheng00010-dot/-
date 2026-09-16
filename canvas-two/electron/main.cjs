@@ -42,7 +42,12 @@ function spawnManaged(command, args, options) {
 function killChildren() {
     for (const child of childProcesses) {
         try {
-            child.kill();
+            if (process.platform === "win32" && child.pid) {
+                // Windows 下 child.kill() 只杀直接子进程（如 npm.cmd 外壳），孙进程（Vite 的 node）会残留，需按进程树终止
+                spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+            } else {
+                child.kill();
+            }
         } catch {
             // 进程可能已退出
         }
@@ -77,10 +82,10 @@ async function ensureBackend() {
     const distEntry = path.join(SERVER_DIR, "dist", "index.js");
     if (fs.existsSync(distEntry)) {
         console.log("[shell] 启动后端（server/dist）");
-        spawnManaged(process.execPath, ["--env-file-if-exists=.env", "dist/index.js"], { cwd: SERVER_DIR });
+        spawnManaged(process.execPath, ["--env-file-if-exists=.env", "dist/index.js"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     } else {
         console.log("[shell] 未找到 server/dist，改用 tsx 启动后端源码");
-        spawnManaged(process.execPath, ["--import", "tsx", "--watch", "src/index.ts"], { cwd: SERVER_DIR });
+        spawnManaged(process.execPath, ["--import", "tsx", "--watch", "src/index.ts"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     }
     const ready = await waitForPort(BACKEND_PORT, { timeoutMs: 60000 });
     if (!ready) {
@@ -95,10 +100,10 @@ async function startWorker() {
     const distEntry = path.join(SERVER_DIR, "dist", "worker.js");
     if (fs.existsSync(distEntry)) {
         console.log("[shell] 启动后台任务进程（server/dist/worker.js）");
-        spawnManaged(process.execPath, ["--env-file-if-exists=.env", "dist/worker.js"], { cwd: SERVER_DIR });
+        spawnManaged(process.execPath, ["--env-file-if-exists=.env", "dist/worker.js"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     } else {
         console.log("[shell] 未找到 server/dist，改用 tsx 启动后台任务进程");
-        spawnManaged(process.execPath, ["--import", "tsx", "src/worker.ts"], { cwd: SERVER_DIR });
+        spawnManaged(process.execPath, ["--import", "tsx", "src/worker.ts"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     }
 }
 

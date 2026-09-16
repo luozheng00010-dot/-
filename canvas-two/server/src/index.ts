@@ -19,6 +19,13 @@ import { detailPageTemplateRouter } from "./detail-page-templates.js";
 import mainImageReplicationRouter from "./main-image-replications.js";
 import mainImageReplicationTemplateRouter from "./main-image-replication-templates.js";
 import { kbRouter } from "./kb/routes.js";
+import videoMaterialsRouter from "./video/routes-materials.js";
+import videoScriptsRouter from "./video/routes-scripts.js";
+import videoExportsRouter from "./video/routes-exports.js";
+import videoSettingsRouter from "./video/routes-settings.js";
+import videoSkusRouter from "./video/routes-skus.js";
+import videoTtsRouter from "./video/routes-tts.js";
+import videoCategoriesRouter from "./video/routes-categories.js";
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 250 * 1024 * 1024 } });
@@ -401,6 +408,13 @@ app.use("/api/detail-page-templates", detailPageTemplateRouter);
 app.use("/api/main-image-replication-projects", mainImageReplicationRouter);
 app.use("/api/main-image-replication-templates", mainImageReplicationTemplateRouter);
 app.use("/api/kb", kbRouter);
+app.use("/api/video", videoMaterialsRouter);
+app.use("/api/video", videoScriptsRouter);
+app.use("/api/video", videoExportsRouter);
+app.use("/api/video", videoSettingsRouter);
+app.use("/api/video", videoSkusRouter);
+app.use("/api/video", videoTtsRouter);
+app.use("/api/video", videoCategoriesRouter);
 
 app.post("/api/media", requireReadyUser, upload.fields([{ name: "file", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), asyncRoute(async (req, res) => {
     const files = req.files as { file?: Express.Multer.File[]; thumbnail?: Express.Multer.File[] } | undefined;

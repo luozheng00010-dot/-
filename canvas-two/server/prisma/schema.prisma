@@ -655,3 +655,136 @@ model KbSetting {
 
   @@map("kb_settings")
 }
+
+// ===== 自动剪辑模块（表互相内聚；media_file_id/thumbnail_media_id/created_by_id 只存 id，不与 MediaFile/User 建外键） =====
+
+// 货号：一等数据，先建后用（上传素材 / 创建文案时必须已存在）。通用素材的 sku 是哨兵值 "通用"（D3），不入本表。
+model VideoSku {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("video_skus")
+}
+
+// 分类：初始 seed 文胸/内裤/通用（isSystem=true）。通用分类不可删除、不可改名。
+// enabled=false 为停用（P2 F6 软删）：不进上传表单/拆句 prompt，已有素材保留不动。
+model VideoCategory {
+  id        String            @id @default(uuid())
+  name      String            @unique
+  isSystem  Boolean           @default(false) @map("is_system")
+  enabled   Boolean           @default(true) @map("enabled")
+  sortOrder Int               @default(0) @map("sort_order")
+  createdAt DateTime          @default(now()) @map("created_at")
+  batches   VideoIngestBatch[]
+  materials VideoMaterial[]
+
+  @@map("video_categories")
+}
+
+// 上传批次：一次批量上传 = 一条批次，页面上用它展示打标进度
+model VideoIngestBatch {
+  id           String          @id @default(uuid())
+  sku          String
+  categoryId   String          @map("category_id")
+  createdById  String          @map("created_by_id")
+  totalCount   Int             @map("total_count")
+  doneCount    Int             @default(0) @map("done_count")
+  failedCount  Int             @default(0) @map("failed_count")
+  status       String          @default("processing") // processing / done / partial / failed
+  createdAt    DateTime        @default(now()) @map("created_at")
+  category     VideoCategory   @relation(fields: [categoryId], references: [id])
+  materials    VideoMaterial[]
+
+  @@map("video_ingest_batches")
+}
+
+// 素材：文件即镜头，单表搞定（不再有 VideoShot 层）
+model VideoMaterial {
+  id               String            @id @default(uuid())
+  batchId          String?           @map("batch_id")
+  mediaFileId      String            @map("media_file_id") // 原视频，MediaFile.origin = "video"
+  thumbnailMediaId String?           @map("thumbnail_media_id") // 抽帧缩略图，也是 MediaFile
+  sku              String // 货号；通用素材为哨兵值 "通用"（D3）
+  categoryId       String            @map("category_id")
+  fileName         String            @map("file_name")
+  duration         Float // 秒，ffprobe 读取，入库必填
+  width            Int?
+  height           Int?
+  tagStatus        String            @default("pending") @map("tag_status") // pending / done / failed
+  tagError         String?           @map("tag_error")
+  description      String? // 一句话画面描述（VLM）
+  shotType         String?           @map("shot_type") // 景别：特写 / 近景 / 中景 / 全景
+  motion           String? // 动作：旋转 / 手持 / 摆放 / 穿戴 / 平铺 ...
+  productVisible   Boolean?          @map("product_visible") // 画面是否露出产品（通用素材安全校验，D5）
+  reviewStatus     String            @default("none") @map("review_status") // none / warn_confirmed / corrected（P2 复核队列用）
+  useCount         Int               @default(0) @map("use_count") // 被时间线采用次数（P3 运营）
+  status           String            @default("active") // active / archived
+  createdAt        DateTime          @default(now()) @map("created_at")
+  batch            VideoIngestBatch? @relation(fields: [batchId], references: [id])
+  category         VideoCategory     @relation(fields: [categoryId], references: [id])
+
+  @@index([sku, categoryId, status])
+  @@index([tagStatus])
+  @@map("video_materials")
+}
+
+// 文案：原始文本 + 拆句结果
+model VideoScript {
+  id        String           @id @default(uuid())
+  title     String
+  sku       String // 目标货号（成片围绕它）
+  rawText   String           @map("raw_text") @db.Text
+  sentences Json? // SentencePlan[]，见 00-总体设计 §5
+  status    String           @default("draft") // draft / split / matched
+  createdById String         @map("created_by_id")
+  createdAt DateTime         @default(now()) @map("created_at")
+  timelines VideoTimeline[]
+
+  @@map("video_scripts")
+}
+
+// 时间线：一句多段的匹配结果（D7）
+model VideoTimeline {
+  id        String             @id @default(uuid())
+  scriptId  String             @map("script_id")
+  version   Int                @default(1) // 人工调整时 +1，可追溯
+  items     Json // TimelineItem[]，见 00-总体设计 §5
+  gapReport Json?              @map("gap_report") // GapReport，见 00-总体设计 §5
+  status    String             @default("matched") // matched / edited / exporting / exported / failed
+  createdAt DateTime           @default(now()) @map("created_at")
+  script    VideoScript        @relation(fields: [scriptId], references: [id])
+  exports   VideoExportTask[]
+
+  @@map("video_timelines")
+}
+
+// 导出任务：worker 轮询执行
+model VideoExportTask {
+  id            String         @id @default(uuid())
+  timelineId    String         @map("timeline_id")
+  params        Json // { resolution, fps, crf, burnSubtitle, ... }
+  progress      Int            @default(0) // 0-100
+  status        String         @default("queued") // queued / running / succeeded / failed
+  error         String?
+  outputMediaId String?        @map("output_media_id") // 成片 MediaFile
+  createdById   String         @map("created_by_id") // 建成片 MediaFile 时作为 owner/creator
+  createdAt     DateTime       @default(now()) @map("created_at")
+  startedAt     DateTime?      @map("started_at")
+  finishedAt    DateTime?      @map("finished_at")
+  timeline      VideoTimeline  @relation(fields: [timelineId], references: [id])
+
+  @@index([status, createdAt])
+  @@map("video_export_tasks")
+}
+
+// 模型渠道设置：仿 KbSetting，管理员在设置页指定拆句/匹配模型与打标视觉模型
+model VideoSetting {
+  id              String  @id // 固定 "default"
+  chatChannelId   String? @map("chat_channel_id")
+  chatModel       String? @map("chat_model")
+  visionChannelId String? @map("vision_channel_id")
+  visionModel     String? @map("vision_model")
+
+  @@map("video_settings")
+}

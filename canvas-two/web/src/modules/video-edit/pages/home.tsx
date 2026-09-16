@@ -1,11 +1,28 @@
-import { Clapperboard } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Clapperboard, FolderOpen, History, PenSquare } from "lucide-react";
 
-const pipelineSteps = [
-    { title: "素材入库打标", description: "镜头切分、抽帧，视觉模型生成结构化标签" },
-    { title: "文案拆解", description: "人工文案拆成分镜，标注每句所需画面" },
-    { title: "画面匹配", description: "向量检索加模型精排，为每句选出最佳镜头" },
-    { title: "时长对齐", description: "按旁白或字幕时长裁切每段画面" },
-    { title: "合成导出", description: "ffmpeg 拼接、字幕、BGM 与转场" },
+const entries = [
+    {
+        title: "素材库",
+        description: "按货号批量上传影棚素材，AI 自动打标入库",
+        href: "/video-edit/materials",
+        icon: FolderOpen,
+        tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    },
+    {
+        title: "去创作",
+        description: "贴一段文案，拆句分镜后自动匹配画面出粗剪",
+        href: "/video-edit/create",
+        icon: PenSquare,
+        tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    },
+    {
+        title: "导出历史",
+        description: "查看合成进度与成片，缺口句自动跳过",
+        href: "/video-edit/exports",
+        icon: History,
+        tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    },
 ];
 
 export default function VideoEditHomePage() {
@@ -17,28 +34,42 @@ export default function VideoEditHomePage() {
                 </span>
                 <div className="min-w-0">
                     <h1 className="text-lg font-semibold tracking-tight">自动剪辑</h1>
-                    <p className="truncate text-sm text-muted-foreground">影棚素材加文案，自动匹配画面出粗剪</p>
+                    <p className="truncate text-sm text-muted-foreground">选货号贴文案，自动匹配素材粗剪成片</p>
                 </div>
-                <span className="ml-auto shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">模块开发中</span>
             </header>
 
-            <section className="mx-auto w-full max-w-3xl flex-1 px-8 py-10">
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
-                    <Clapperboard className="size-10 text-muted-foreground/50" />
-                    <p className="mt-4 text-sm text-muted-foreground">剪辑工作台尚未开放，以下为规划中的处理流程</p>
+            <section className="mx-auto w-full max-w-4xl flex-1 px-8 py-10">
+                <div className="rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
+                    <p>
+                        <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-center text-xs font-semibold text-primary">1</span>
+                        先到素材库，把同货号的影棚视频批量上传（分类选"通用"可补充不露产品的氛围画面），等待打标完成；
+                    </p>
+                    <p className="mt-1.5">
+                        <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-center text-xs font-semibold text-primary">2</span>
+                        再去创作页贴文案，系统拆句分镜、按货号 + 分类自动挑画面，匹配不到的句子会如实标出缺口。
+                    </p>
                 </div>
 
-                <ol className="mt-10 space-y-1">
-                    {pipelineSteps.map((step, index) => (
-                        <li key={step.title} className="flex items-baseline gap-4 rounded-lg px-4 py-3 transition hover:bg-muted">
-                            <span className="w-6 shrink-0 text-right text-sm font-medium tabular-nums text-muted-foreground">{index + 1}</span>
-                            <div className="min-w-0">
-                                <div className="text-sm font-medium">{step.title}</div>
-                                <div className="mt-0.5 text-sm text-muted-foreground">{step.description}</div>
-                            </div>
-                        </li>
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                    {entries.map((entry) => (
+                        <Link
+                            key={entry.title}
+                            to={entry.href}
+                            className="group rounded-xl border border-border bg-card p-5 transition hover:border-primary/40 hover:shadow-sm"
+                        >
+                            <span className={`grid size-10 place-items-center rounded-lg ${entry.tone}`}>
+                                <entry.icon className="size-5" />
+                            </span>
+                            <h2 className="mt-3 text-sm font-semibold">{entry.title}</h2>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{entry.description}</p>
+                            <span className="mt-3 inline-block text-xs text-primary opacity-0 transition group-hover:opacity-100">进入 →</span>
+                        </Link>
                     ))}
-                </ol>
+                </div>
+
+                <p className="mt-6 text-xs text-muted-foreground">
+                    素材为 1~5 秒的无声单镜头视频；成片导出为 1080×1920 竖版 mp4，字幕自动烧录，缺口句在成片中跳过。
+                </p>
             </section>
         </main>
     );

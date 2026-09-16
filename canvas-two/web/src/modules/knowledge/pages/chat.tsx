@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { App, Button, Empty, Input, Popconfirm, Spin, Tooltip } from "antd";
-import { ArrowDownToLine, Bot, FileText, Library, MessageSquare, Plus, SendHorizonal, ThumbsDown, ThumbsUp, Trash2, User } from "lucide-react";
-import { createKbConversation, deleteKbConversation, getKbConversation, listKbConversations, sendKbFeedback, streamKbMessage } from "../api";
+import { ArrowDownToLine, Bot, FileText, Library, MessageSquare, Pencil, Plus, SendHorizonal, ThumbsDown, ThumbsUp, Trash2, User } from "lucide-react";
+import { createKbConversation, deleteKbConversation, getKbConversation, listKbConversations, renameKbConversation, sendKbFeedback, streamKbMessage } from "../api";
 import { KbMarkdown } from "../components/bits";
 import type { KbCitation, KbConversation, KbMessage } from "../types";
 
@@ -20,6 +20,9 @@ export default function KnowledgeChatPage() {
     const [asking, setAsking] = useState(false);
     const [loadingConv, setLoadingConv] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const [renameValue, setRenameValue] = useState("");
+    const renameCancelledRef = useRef(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const abortRef = useRef<AbortController | null>(null);
 
@@ -109,6 +112,33 @@ export default function KnowledgeChatPage() {
         }
     };
 
+    const startRename = (item: KbConversation) => {
+        renameCancelledRef.current = false;
+        setRenamingId(item.id);
+        setRenameValue(item.title);
+    };
+
+    const submitRename = async () => {
+        const convId = renamingId;
+        const title = renameValue.trim();
+        if (!convId || renameCancelledRef.current) {
+            setRenamingId(null);
+            return;
+        }
+        if (!title) {
+            setRenamingId(null);
+            return;
+        }
+        try {
+            await renameKbConversation(convId, title);
+            setConversations((current) => current.map((item) => (item.id === convId ? { ...item, title } : item)));
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "重命名失败");
+        } finally {
+            setRenamingId(null);
+        }
+    };
+
     const feedback = async (item: ChatViewMessage, value: 1 | -1) => {
         if (!item.id || item.id.startsWith("local")) return;
         try {
@@ -133,7 +163,40 @@ export default function KnowledgeChatPage() {
                             onClick={() => navigate(`/knowledge/chat/${item.id}`)}
                         >
                             <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                            {renamingId === item.id ? (
+                                <Input
+                                    size="small"
+                                    autoFocus
+                                    className="min-w-0 flex-1"
+                                    value={renameValue}
+                                    maxLength={60}
+                                    onChange={(event) => setRenameValue(event.target.value)}
+                                    onPressEnter={() => void submitRename()}
+                                    onBlur={() => void submitRename()}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Escape") {
+                                            event.stopPropagation();
+                                            renameCancelledRef.current = true;
+                                            setRenamingId(null);
+                                        }
+                                    }}
+                                    onClick={(event) => event.stopPropagation()}
+                                />
+                            ) : (
+                                <span className="min-w-0 flex-1 truncate" onDoubleClick={() => startRename(item)}>{item.title}</span>
+                            )}
+                            {renamingId !== item.id && (
+                                <Button
+                                    size="small"
+                                    type="text"
+                                    className="!hidden shrink-0 group-hover:!inline-flex"
+                                    icon={<Pencil className="size-3.5" />}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        startRename(item);
+                                    }}
+                                />
+                            )}
                             <Popconfirm title="删除该会话？" onConfirm={() => void removeConversation(item.id)}>
                                 <Button
                                     size="small"

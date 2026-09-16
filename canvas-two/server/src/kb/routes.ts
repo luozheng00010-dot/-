@@ -216,6 +216,14 @@ router.get("/chat/conversations", async (req, res) => {
     res.json({ conversations });
 });
 
+router.patch("/chat/conversations/:id", async (req, res) => {
+    const input = z.object({ title: z.string().trim().min(1, "标题不能为空").max(60, "标题最长 60 字") }).parse(req.body);
+    const existing = await prisma.kbConversation.findUniqueOrThrow({ where: { id: routeParam(req.params.id) } });
+    if (existing.userId !== req.user!.id) throw Object.assign(new Error("无权修改该会话"), { status: 403 });
+    const conversation = await prisma.kbConversation.update({ where: { id: existing.id }, data: { title: input.title } });
+    res.json({ conversation });
+});
+
 router.get("/chat/conversations/:id", async (req, res) => {
     const conversation = await prisma.kbConversation.findUniqueOrThrow({ where: { id: routeParam(req.params.id) } });
     if (conversation.userId !== req.user!.id) throw Object.assign(new Error("无权访问该会话"), { status: 403 });

@@ -99,6 +99,10 @@ export async function getKbConversation(id: string) {
     return serverApi<{ conversation: KbConversation; messages: KbMessage[] }>(`/api/kb/chat/conversations/${id}`);
 }
 
+export async function renameKbConversation(id: string, title: string) {
+    return serverApi<{ conversation: KbConversation }>(`/api/kb/chat/conversations/${id}`, { method: "PATCH", ...jsonBody({ title }) });
+}
+
 export async function deleteKbConversation(id: string) {
     return serverApi<{ ok: true }>(`/api/kb/chat/conversations/${id}`, { method: "DELETE" });
 }
