@@ -8,6 +8,11 @@ export function mergeUpstreamUrl(baseUrl: string, suffix: string) {
             break;
         }
     }
+    // base 已带版本段（如智谱 …/api/paas/v4）而 suffix 是固定 /v1 时，剥掉 suffix 的版本段，
+    // 避免拼出 …/v4/v1/embeddings 这样的错误路径。
+    if (/\/v[0-9][0-9a-z.-]*$/.test(basePath) && /^\/v[0-9][0-9a-z.-]*(?=\/)/i.test(normalizedSuffix)) {
+        normalizedSuffix = normalizedSuffix.replace(/^\/v[0-9][0-9a-z.-]*(?=\/)/i, "");
+    }
     return new URL(`${normalizedBase}${normalizedSuffix}`);
 }
 

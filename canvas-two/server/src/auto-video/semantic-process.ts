@@ -17,7 +17,8 @@ async function analyze(job: any) {
     await fenced(job, async (tx) => { await tx.localVideoMaterial.updateMany({ where: { id: item.id, revision: item.revision, deletedAt: null }, data: { duration: media.duration, width: media.width, height: media.height, fps: media.fps, thumbnail: media.thumbnail } }); });
     const model = await resolveModel("vision");
     if (!model.verified) throw fail("请管理员先完成视觉模型连接测试");
-    const result = annotationInput.parse(job.result?.annotation ?? await modelJson(model, '你是产品视频标注员。图片按时间顺序排列，只描述可观察内容，不得把面料外观推断为防水、耐磨等功能。多场景、不清楚或相互矛盾标记 needsReview=true。userNotes 是上传者填写的产品背景（型号、卖点名称等），仅供理解画面语境，不得把备注宣称当作可见证据写进描述。返回 {summary:string,parts:string[],actions:string[],tags:string[],shot:string,scene:string,colors:string[],warnings:string[],generic:boolean,needsReview:boolean}。', { fileName: item.fileName, duration: media.duration, userNotes: item.notes ?? "" }, media.frames));
+// maxTokens 给足：部分中转默认上限很小，标注 JSON 被截断会解析失败。
+const result = annotationInput.parse(job.result?.annotation ?? await modelJson(model, '你是产品视频标注员。图片按时间顺序排列，只描述可观察内容，不得把面料外观推断为防水、耐磨等功能。多场景、不清楚或相互矛盾标记 needsReview=true。userNotes 是上传者填写的产品背景（型号、卖点名称等），仅供理解画面语境，不得把备注宣称当作可见证据写进描述。返回 {summary:string,parts:string[],actions:string[],tags:string[],shot:string,scene:string,colors:string[],warnings:string[],generic:boolean,needsReview:boolean}。', { fileName: item.fileName, duration: media.duration, userNotes: item.notes ?? "" }, media.frames, { maxTokens: 1500 }));
     result.warnings = result.warnings.slice(0, 13);
     // 人工备注以素材行的 notes 列为准，随标注一起入索引与标签召回。
     result.userNotes = (item.notes ?? "").slice(0, 500);

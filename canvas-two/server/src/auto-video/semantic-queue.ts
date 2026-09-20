@@ -21,7 +21,8 @@ async function loop(kinds: string[], lane: number) {
         try {
             job = await prisma.$transaction(async (tx) => {
                 // PostgreSQL advisory lock gives each lane a global concurrency limit across worker processes.
-                await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(91371, ${lane})`;
+                // lane 必须显式转成 int，否则 Prisma 会按 bigint 传参，触发 42883（无匹配函数）。
+                await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(91371, ${lane}::int)`;
                 const active = await tx.autoVideoJob.findFirst({ where: { leaseToken: { startsWith: `${lane}:` }, status: "running", leaseUntil: { gt: new Date() } } });
                 if (active) return null;
                 const rows = await tx.$queryRaw<any[]>(Prisma.sql`SELECT id FROM auto_video_jobs WHERE kind IN (${Prisma.join(kinds)}) AND ((status='queued' AND available_at<=NOW()) OR (status='running' AND lease_until<NOW())) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`);
