@@ -61,7 +61,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose, onToggleAgent }
                                             {openKey ? (
                                                 <div className="mt-0.5 space-y-0.5">
                                                     {item.children.map((child) => {
-                                                        const childActive = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                                                        const childActive = pathname === child.href || (pathname.startsWith(`${child.href}/`) && !item.children?.some((other) => other.href !== child.href && (pathname === other.href || pathname.startsWith(`${other.href}/`))));
                                                         return (
                                                             <Link
                                                                 key={child.key}

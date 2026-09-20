@@ -19,6 +19,9 @@ const envSchema = z.object({
         (value) => typeof value === "string" && !value.trim() ? undefined : value,
         z.string().trim().url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "WORKER_PROXY_URL 仅支持 HTTP(S) 代理").optional(),
     ),
+    AUTO_VIDEO_API_URL: z.string().trim().url().default("http://127.0.0.1:8080"),
+    AUTO_VIDEO_DIR: z.string().trim().default("../auto-video"),
+    AUTO_VIDEO_API_KEY: z.string().default(""),
 });
 
 export const env = envSchema.parse(process.env);

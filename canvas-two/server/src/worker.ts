@@ -9,8 +9,7 @@ import { ensureBucket, removeObject } from "./storage.js";
 import { configureWorkerProxy } from "./worker-proxy.js";
 import { mainImageReplicationContext, markMainImageReplicationRunning, saveMainImageReplicationResult } from "./main-image-replications.js";
 import { startKbIndexer, stopKbIndexer } from "./kb/indexer.js";
-import { startVideoIngest, stopVideoIngest } from "./video/ingest.js";
-import { startVideoExport, stopVideoExport } from "./video/export.js";
+import { startSemanticWorkers, stopSemanticWorkers } from "./auto-video/semantic-queue.js";
 
 type TaskResult = { index: number; status: "queued" | "running" | "succeeded" | "failed"; mediaId?: string; width?: number; height?: number; error?: string };
 type TaskReference = { mediaId: string; name?: string; type?: string };
@@ -358,8 +357,7 @@ async function start() {
     await Promise.all(Array.from({ length: env.IMAGE_WORKER_CONCURRENCY }, workerLoop));
 }
 
-for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, () => { stopping = true; healthy = false; stopKbIndexer(); stopVideoIngest(); stopVideoExport(); });
+for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, () => { stopping = true; healthy = false; stopKbIndexer(); stopSemanticWorkers(); });
+void startSemanticWorkers();
 void startKbIndexer();
-void startVideoIngest();
-void startVideoExport();
 void start().catch((error) => { console.error(error); process.exitCode = 1; });

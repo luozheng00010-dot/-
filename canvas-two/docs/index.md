@@ -43,3 +43,5 @@
 ## 原理说明
 
 - [本地 Codex 连接画布原理](/docs/development/local-codex-canvas)
+
+- 本地短视频语义剪辑：`auto-video/SEMANTIC-LOCAL-VIDEO.md`（集成、接口、部署和人工验收，当前待测试）。

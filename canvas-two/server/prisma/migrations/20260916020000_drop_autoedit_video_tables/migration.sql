@@ -1,0 +1,9 @@
+-- 移除旧自动剪辑模块（已被 auto-video / MoneyPrinterTurbo 子模块替代）
+DROP TABLE IF EXISTS "video_export_tasks" CASCADE;
+DROP TABLE IF EXISTS "video_materials" CASCADE;
+DROP TABLE IF EXISTS "video_ingest_batches" CASCADE;
+DROP TABLE IF EXISTS "video_timelines" CASCADE;
+DROP TABLE IF EXISTS "video_scripts" CASCADE;
+DROP TABLE IF EXISTS "video_categories" CASCADE;
+DROP TABLE IF EXISTS "video_skus" CASCADE;
+DROP TABLE IF EXISTS "video_settings" CASCADE;

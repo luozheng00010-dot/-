@@ -46,6 +46,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-canvas-minio-change-me}
       MINIO_BUCKET: infinite-canvas
       PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-}
+      AUTO_VIDEO_API_URL: http://auto-video:8080
+      AUTO_VIDEO_API_KEY: ${AUTO_VIDEO_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +76,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-canvas-minio-change-me}
       MINIO_BUCKET: infinite-canvas
       PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-}
+      AUTO_VIDEO_API_URL: http://auto-video:8080
+      AUTO_VIDEO_API_KEY: ${AUTO_VIDEO_API_KEY:-}
       WORKER_PORT: 3002
       IMAGE_WORKER_CONCURRENCY: ${IMAGE_WORKER_CONCURRENCY:-8}
       WORKER_PROXY_URL: ${WORKER_PROXY_URL:-}
@@ -95,6 +99,30 @@ services:
       ANALYTICS_BAIDU_ID: ${ANALYTICS_BAIDU_ID:-}
     depends_on:
       - api
+    restart: unless-stopped
+
+  # 自动剪辑模块（MoneyPrinterTurbo）引擎：API :8080，主界面「自动剪辑」通过 server 代理调用；配置见 auto-video/config.toml
+  auto-video:
+    build:
+      context: ./auto-video
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: ["python3", "main.py"]
+    volumes:
+      - ./auto-video:/MoneyPrinterTurbo
+    restart: unless-stopped
+
+  # 可选：上游 Streamlit 完整控制台（上传本地素材/BGM 等高级功能），日常用主界面即可
+  auto-video-webui:
+    build:
+      context: ./auto-video
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8501:8501"
+    command: ["streamlit", "run", "./webui/Main.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.gatherUsageStats=False", "--client.toolbarMode=minimal", "--server.showEmailPrompt=False"]
+    volumes:
+      - ./auto-video:/MoneyPrinterTurbo
     restart: unless-stopped
 
 volumes:

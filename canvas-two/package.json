@@ -1,0 +1,12 @@
+{
+    "name": "infinite-canvas-workspace",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "node scripts/dev.mjs",
+        "dev:web": "npm --prefix web run dev",
+        "dev:server": "npm --prefix server run dev",
+        "dev:auto-video": "node scripts/dev.mjs --auto-only",
+        "install:all": "npm --prefix server install && npm --prefix web install"
+    }
+}

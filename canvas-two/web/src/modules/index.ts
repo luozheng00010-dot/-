@@ -3,6 +3,6 @@
  * 注意只做副作用导入，模块元数据在 import 时同步注册，页面代码仍按需懒加载。
  */
 import "./canvas";
-import "./video-edit";
+import "./auto-video";
 import "./product-listing";
 import "./knowledge";

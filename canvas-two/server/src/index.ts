@@ -19,13 +19,8 @@ import { detailPageTemplateRouter } from "./detail-page-templates.js";
 import mainImageReplicationRouter from "./main-image-replications.js";
 import mainImageReplicationTemplateRouter from "./main-image-replication-templates.js";
 import { kbRouter } from "./kb/routes.js";
-import videoMaterialsRouter from "./video/routes-materials.js";
-import videoScriptsRouter from "./video/routes-scripts.js";
-import videoExportsRouter from "./video/routes-exports.js";
-import videoSettingsRouter from "./video/routes-settings.js";
-import videoSkusRouter from "./video/routes-skus.js";
-import videoTtsRouter from "./video/routes-tts.js";
-import videoCategoriesRouter from "./video/routes-categories.js";
+import { autoVideoRouter } from "./auto-video/routes.js";
+import { localMaterialRouter } from "./local-materials/routes.js";
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 250 * 1024 * 1024 } });
@@ -408,13 +403,8 @@ app.use("/api/detail-page-templates", detailPageTemplateRouter);
 app.use("/api/main-image-replication-projects", mainImageReplicationRouter);
 app.use("/api/main-image-replication-templates", mainImageReplicationTemplateRouter);
 app.use("/api/kb", kbRouter);
-app.use("/api/video", videoMaterialsRouter);
-app.use("/api/video", videoScriptsRouter);
-app.use("/api/video", videoExportsRouter);
-app.use("/api/video", videoSettingsRouter);
-app.use("/api/video", videoSkusRouter);
-app.use("/api/video", videoTtsRouter);
-app.use("/api/video", videoCategoriesRouter);
+app.use("/api/auto-video", autoVideoRouter);
+app.use("/api/local-materials", localMaterialRouter);
 
 app.post("/api/media", requireReadyUser, upload.fields([{ name: "file", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), asyncRoute(async (req, res) => {
     const files = req.files as { file?: Express.Multer.File[]; thumbnail?: Express.Multer.File[] } | undefined;
@@ -537,10 +527,11 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const missingTableName = String(item.meta?.table || item.message || "");
     const missingProductTable = item.code === "P2021" && /products|product_media/i.test(missingTableName);
     const missingDetailPageTable = item.code === "P2021" && /detail_page_projects|detail_page_pairs|detail_page_pair_variants|detail_page_templates|detail_page_template_references|main_image_replication_projects|main_image_replication_pairs|main_image_replication_variants|main_image_replication_templates|main_image_replication_template_references/i.test(missingTableName);
-    const missingTable = missingProductTable || missingDetailPageTable;
+    const missingAutoVideoTable = item.code === "P2021" && /auto_video_settings/i.test(missingTableName);
+    const missingTable = missingProductTable || missingDetailPageTable || missingAutoVideoTable;
     const notFound = item.code === "P2025" || item.name === "NotFoundError";
     const status = missingTable ? 503 : item.status || (item.name === "ZodError" ? 400 : notFound ? 404 : 500);
-    const message = missingProductTable ? "商品图数据库未初始化，请先执行数据库同步" : missingDetailPageTable ? "详情页复刻数据库未初始化，请先执行数据库同步" : notFound ? "请求的资源不存在" : item.message || "Server error";
+    const message = missingProductTable ? "商品图数据库未初始化，请先执行数据库同步" : missingDetailPageTable ? "详情页复刻数据库未初始化，请先执行数据库同步" : missingAutoVideoTable ? "自动剪辑模型设置尚未初始化，请同步数据库并重启主服务" : notFound ? "请求的资源不存在" : item.message || "Server error";
     if (status >= 500) console.error(error);
     res.status(status).json({ error: message, code: item.code });
 });

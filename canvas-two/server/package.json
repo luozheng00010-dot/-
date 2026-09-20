@@ -8,6 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "start:worker": "node --env-file-if-exists=.env dist/worker.js",
+    "dev:api": "node --env-file-if-exists=.env --import tsx --watch src/index.ts",
+    "dev:worker": "node --env-file-if-exists=.env --import tsx --watch src/worker.ts",
     "dev:prepare": "prisma generate && prisma db push --skip-generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",

@@ -79,13 +79,13 @@ async function ensureBackend() {
         console.log(`[shell] 后端已在运行（:${BACKEND_PORT}），复用现有进程`);
         return;
     }
-    const distEntry = path.join(SERVER_DIR, "dist", "index.js");
-    if (fs.existsSync(distEntry)) {
+    if (IS_DEV) {
+        await prepareDevDatabase();
+        console.log("[shell] 启动后端源码（tsx watch）");
+        spawnManaged(process.execPath, ["--env-file-if-exists=.env", "--import", "tsx", "--watch", "src/index.ts"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
+    } else {
         console.log("[shell] 启动后端（server/dist）");
         spawnManaged(process.execPath, ["--env-file-if-exists=.env", "dist/index.js"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
-    } else {
-        console.log("[shell] 未找到 server/dist，改用 tsx 启动后端源码");
-        spawnManaged(process.execPath, ["--import", "tsx", "--watch", "src/index.ts"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     }
     const ready = await waitForPort(BACKEND_PORT, { timeoutMs: 60000 });
     if (!ready) {
@@ -94,16 +94,29 @@ async function ensureBackend() {
     await startWorker();
 }
 
-/** 后台任务进程（图片生成 + 知识库索引），复用后端构建产物或 tsx */
+/** 与 server 的 dev:prepare 一致，不使用会强制接受数据丢失的参数。 */
+async function prepareDevDatabase() {
+    console.log("[shell] 生成 Prisma Client 并同步开发数据库");
+    for (const args of [["generate"], ["db", "push", "--skip-generate"]]) {
+        const child = spawnManaged(process.execPath, ["--env-file-if-exists=.env", "node_modules/prisma/build/index.js", ...args], {
+            cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+        });
+        await new Promise((resolve, reject) => {
+            child.once("error", reject);
+            child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(`Prisma ${args.join(" ")} 失败，请查看启动日志`)));
+        });
+    }
+}
+
+/** 后台任务进程（图片生成 + 知识库索引），开发模式始终使用源码。 */
 async function startWorker() {
     if (await isPortOpen(WORKER_PORT)) return;
-    const distEntry = path.join(SERVER_DIR, "dist", "worker.js");
-    if (fs.existsSync(distEntry)) {
+    if (IS_DEV) {
+        console.log("[shell] 启动后台任务源码（tsx watch）");
+        spawnManaged(process.execPath, ["--env-file-if-exists=.env", "--import", "tsx", "--watch", "src/worker.ts"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
+    } else {
         console.log("[shell] 启动后台任务进程（server/dist/worker.js）");
         spawnManaged(process.execPath, ["--env-file-if-exists=.env", "dist/worker.js"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
-    } else {
-        console.log("[shell] 未找到 server/dist，改用 tsx 启动后台任务进程");
-        spawnManaged(process.execPath, ["--import", "tsx", "src/worker.ts"], { cwd: SERVER_DIR, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     }
 }
 
