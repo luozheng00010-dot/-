@@ -16,11 +16,12 @@ export const listLibraryOptions = (kind: LibraryKind) => serverApi<LibraryOption
 export const saveLibraryOption = (kind: LibraryKind, name: string, id?: string) => serverApi<LibraryOption>(`${base}/${kind}${id ? `/${id}` : ""}`, { method: id ? "PATCH" : "POST", ...jsonBody({ name }) });
 export const deleteLibraryOption = (kind: LibraryKind, id: string) => serverApi(`${base}/${kind}/${id}`, { method: "DELETE" });
 export const availableCategories = (skuId: string) => serverApi<LibraryOption[]>(`${base}/available-categories?skuId=${encodeURIComponent(skuId)}`);
-export function listLocalVideos(input: { skuId?: string; categoryIds?: string[]; search?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
+export function listLocalVideos(input: { skuId?: string; categoryIds?: string[]; search?: string; status?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
     const query = new URLSearchParams();
     if (input.skuId) query.set("skuId", input.skuId);
     if (input.categoryIds?.length) query.set("categoryIds", input.categoryIds.join(","));
     if (input.search) query.set("search", input.search);
+    if (input.status) query.set("status", input.status);
     query.set("page", String(input.page ?? 1));
     query.set("pageSize", String(input.pageSize ?? 20));
     return serverApi<{ items: LocalVideo[]; total: number }>(`${base}?${query}`, { signal });
@@ -35,6 +36,8 @@ export function uploadLocalVideo(file: File, skuId: string, categoryId: string, 
 }
 export const assignLocalVideo = (id: string, skuId: string, categoryId: string) => serverApi<LocalVideo>(`${base}/${id}`, { method: "PATCH", ...jsonBody({ skuId, categoryId }) });
 export const deleteLocalVideo = (id: string) => serverApi(`${base}/${id}`, { method: "DELETE" });
+// 开发测试辅助：清空某货号下的全部素材（服务端限管理员）。
+export const deleteLocalVideosBySku = (skuId: string) => serverApi<{ ok: boolean; count: number }>(`${base}/by-sku/${skuId}`, { method: "DELETE" });
 export const localVideoUrl = (id: string) => apiUrl(`${base}/${id}/preview`);
 export const analyzeMaterials = (ids: string[]) => serverApi(`${base}/analyze`, { method: "POST", ...jsonBody({ ids }) });
 export const annotateMaterial = (id: string, body: { revision: number; annotation?: MaterialAnnotation; disabled?: boolean; acceptProposed?: boolean }) => serverApi(`${base}/${id}/annotation`, { method: "PATCH", ...jsonBody(body) });

@@ -41,10 +41,15 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
             colorLinkHover: color.primaryHover,
             colorLinkActive: color.primary,
             colorTextLightSolid: color.primaryText,
+            borderRadius: 10,
+            fontFamily: '"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif',
         },
         components: {
             Button: {
                 primaryShadow: "none",
+            },
+            Card: {
+                paddingLG: 20,
             },
             Menu: {
                 itemActiveBg: color.menuBg,
@@ -55,14 +60,27 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
                 darkItemSelectedBg: neutral.dark.menuBg,
                 darkItemSelectedColor: neutral.dark.menuText,
             },
+            Segmented: {
+                itemHoverBg: color.selectActiveBg,
+                itemSelectedBg: dark ? "#333333" : "#ffffff",
+                trackBg: dark ? "#1f1f1f" : "#f5f5f5",
+            },
             Select: {
                 optionActiveBg: color.selectActiveBg,
                 optionSelectedBg: color.selectSelectedBg,
                 optionSelectedColor: color.selectText,
             },
             Table: {
+                cellPaddingBlock: 12,
+                headerSplitColor: "transparent",
+                rowHoverBg: color.tableSelectedBg,
                 rowSelectedBg: color.tableSelectedBg,
                 rowSelectedHoverBg: color.tableSelectedHoverBg,
+            },
+            Tabs: {
+                itemHoverColor: color.primary,
+                itemSelectedColor: color.primary,
+                inkBarColor: color.primary,
             },
         },
     };

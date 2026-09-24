@@ -2,7 +2,7 @@ import os
 import pathlib
 import re
 from fastapi import Depends, Request, UploadFile
-from fastapi.params import File
+from fastapi.params import File, Form
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
@@ -145,14 +145,16 @@ def upload_bgm_file(request: Request, file: UploadFile = File(...)):
 
 
 @router.post("/library-videos", response_model=VideoMaterialUploadResponse)
-def upload_library_video(request: Request, file: UploadFile = File(...)):
+def upload_library_video(request: Request, file: UploadFile = File(...), folder: str = Form("")):
+    # 直接函数调用（测试）不经过 FastAPI 参数解析，Form 默认值不会是 str。
+    folder_name = folder if isinstance(folder, str) else ""
     if pathlib.Path(file.filename or "").suffix.lower() not in material_upload_service.SUPPORTED_VIDEO_EXTENSIONS:
         raise HttpException(task_id=base.get_task_id(request), status_code=400, message="本地素材库仅支持视频")
     request_id = base.get_task_id(request)
     try:
         safe_filename = _sanitize_upload_filename(file.filename, request_id)
         stored_filename = material_upload_service.save_material_upload(
-            safe_filename, file.file
+            safe_filename, file.file, folder_name
         )
     except material_upload_service.MaterialUploadError as exc:
         logger.warning(

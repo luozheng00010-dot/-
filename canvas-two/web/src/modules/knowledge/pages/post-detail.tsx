@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { App, Button, Empty, Input, Popconfirm, Spin, Tag } from "antd";
+import { App, Button, Empty, Input, Popconfirm, Spin } from "antd";
 import { ArrowLeft, CornerDownRight, Eye, Library, MessagesSquare, PenSquare, ShieldCheck, Trash2 } from "lucide-react";
 import { useAuthStore } from "@/stores/use-auth-store";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { addKbComment, archiveKbPost, getKbPost } from "../api";
 import { KbMarkdown, OfficialBadge, PostTypeBadge } from "../components/bits";
 import type { KbComment, KbPostCard, KbPostDetail } from "../types";
@@ -68,8 +69,8 @@ export default function KnowledgePostDetailPage() {
     return (
         <main className="flex h-full flex-col overflow-y-auto bg-background text-foreground">
             <header className="flex items-center gap-3 border-b border-border px-6 py-4">
-                <Button icon={<ArrowLeft className="size-4" />} onClick={() => navigate(-1)}>返回</Button>
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                <Button type="text" icon={<ArrowLeft className="size-4" />} onClick={() => navigate(-1)}>返回</Button>
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
                     <Library className="size-5" />
                 </span>
                 <div className="min-w-0">
@@ -95,10 +96,10 @@ export default function KnowledgePostDetailPage() {
                             <div className="flex flex-wrap items-center gap-2">
                                 <PostTypeBadge type={post.type} />
                                 {post.official && <OfficialBadge />}
-                                {post.status !== "published" && <Tag color="orange">未发布</Tag>}
-                                {post.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
+                                {post.status !== "published" && <StatusBadge tone="warning" label="未发布" />}
+                                {post.tags.map((tag) => <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{tag}</span>)}
                             </div>
-                            <h2 className="mt-3 text-xl font-semibold leading-8">{post.title}</h2>
+                            <h2 className="mt-3 text-xl font-semibold leading-8 tracking-tight">{post.title}</h2>
                             <div className="mt-2 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                                 <span className="inline-flex items-center gap-1"><ShieldCheck className="size-3.5" />{post.author.username}</span>
                                 {post.category && <span>{post.category.name}</span>}
@@ -106,7 +107,7 @@ export default function KnowledgePostDetailPage() {
                                 <span className="inline-flex items-center gap-0.5"><Eye className="size-3.5" />{post.viewCount}</span>
                             </div>
 
-                            <article className="mt-6 rounded-lg border border-border bg-card px-6 py-5">
+                            <article className="mt-6 rounded-xl border border-border bg-card px-6 py-5">
                                 <KbMarkdown content={post.content} />
                             </article>
 
@@ -115,7 +116,7 @@ export default function KnowledgePostDetailPage() {
                                     <MessagesSquare className="size-4" />
                                     评论（{comments.length}）
                                 </h3>
-                                <div className="mt-3 rounded-lg border border-border bg-card px-4 py-3">
+                                <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3">
                                     {replyTo && (
                                         <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                                             <CornerDownRight className="size-3.5" />
@@ -137,8 +138,11 @@ export default function KnowledgePostDetailPage() {
                                     {comments.map((comment) => {
                                         const parent = comment.parentId ? comments.find((item) => item.id === comment.parentId) : null;
                                         return (
-                                            <li key={comment.id} className="rounded-lg border border-border bg-card px-4 py-3">
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <li key={comment.id} className="rounded-xl border border-border bg-card px-4 py-3">
+                                                <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                                                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-violet-500/10 text-[11px] font-semibold text-violet-600 dark:text-violet-400">
+                                                        {comment.author.username.slice(0, 1).toUpperCase()}
+                                                    </span>
                                                     <span className="font-medium text-foreground">{comment.author.username}</span>
                                                     <span>{new Date(comment.createdAt).toLocaleString("zh-CN")}</span>
                                                     <Button size="small" type="link" className="ml-auto" onClick={() => setReplyTo(comment)}>回复</Button>
@@ -158,7 +162,7 @@ export default function KnowledgePostDetailPage() {
                         </div>
 
                         <aside className="hidden lg:block">
-                            <div className="sticky top-6 rounded-lg border border-border bg-card px-4 py-3">
+                            <div className="sticky top-6 rounded-xl border border-border bg-card px-4 py-3">
                                 <h3 className="text-sm font-semibold">相关帖子</h3>
                                 <ul className="mt-3 space-y-2">
                                     {related.map((item) => (

@@ -51,9 +51,14 @@ export default function PlanPreview({ plan, variant, unit }: { plan: Plan; varia
     return <div className="flex flex-col gap-3">
         <Alert type="info" title="轻量预览使用已保存的旁白与镜头顺序；最终字幕样式、BGM 在出片时合成。遇到缺口会暂停。" />
         {error && <Alert type="warning" title={error} />}
-        <video ref={video} muted playsInline className="mx-auto max-h-[48vh] w-full" style={{ aspectRatio: doc.options.video_aspect.replace(":", "/"), objectFit: doc.options.video_fit_mode === "cover" ? "cover" : "contain" }} onError={() => { audio.current?.pause(); setError("素材播放失败，请检查文件和浏览器编码支持"); }} />
-        {doc.options.subtitle_enabled && <p className="text-center">{caption}</p>}
+        <video ref={video} muted playsInline className={`${doc.options.video_aspect === "9:16" ? "mx-auto h-[48vh] max-w-full" : "mx-auto max-h-[48vh] w-full"} rounded-lg bg-black`} style={{ aspectRatio: doc.options.video_aspect.replace(":", "/"), objectFit: doc.options.video_fit_mode === "cover" ? "cover" : "contain" }} onError={() => { audio.current?.pause(); setError("素材播放失败，请检查文件和浏览器编码支持"); }} />
+        {doc.options.subtitle_enabled && (
+            <p className="mx-auto max-w-prose rounded-md bg-muted px-3 py-1.5 text-center text-sm">{caption}</p>
+        )}
         <audio ref={audio} src={planAudio(plan.id)} controls className="w-full" />
-        <Space><Button onClick={() => { setError(""); if (audio.current) { audio.current.currentTime = start; void audio.current.play().catch(() => setError("配音播放失败")); } }}>从{unit === undefined ? "开头" : "本句"}播放</Button><Button onClick={() => audio.current?.pause()}>暂停</Button></Space>
+        <Space>
+            <Button type="primary" onClick={() => { setError(""); if (audio.current) { audio.current.currentTime = start; void audio.current.play().catch(() => setError("配音播放失败")); } }}>从{unit === undefined ? "开头" : "本句"}播放</Button>
+            <Button onClick={() => audio.current?.pause()}>暂停</Button>
+        </Space>
     </div>;
 }

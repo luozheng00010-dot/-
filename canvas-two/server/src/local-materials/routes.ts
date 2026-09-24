@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
-import { requireReadyUser } from "../access.js";
+import { requireAdmin, requireReadyUser } from "../access.js";
 import { prisma } from "../db.js";
 import { forwardStream, uploadEngineFile, removeEngineUpload } from "../auto-video/engine.js";
 import { libraryName, materialAssignment, nameKey } from "./input.js";
@@ -69,11 +69,12 @@ localMaterialRouter.get("/available-categories", async (req, res) => {
 localMaterialRouter.get("/", async (req, res) => {
     const input = z.object({
         skuId: idInput.optional(), categoryIds: z.string().optional(), search: z.string().max(100).optional(),
+        status: z.enum(["pending", "queued", "indexing", "ready", "review", "failed"]).optional(),
         page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(20),
     }).parse(req.query);
     const ids = input.categoryIds ? z.array(idInput).parse(input.categoryIds.split(",")) : undefined;
     const where = {
-        deletedAt: null, skuId: input.skuId, categoryId: ids ? { in: ids } : undefined,
+        deletedAt: null, skuId: input.skuId, categoryId: ids ? { in: ids } : undefined, analysisStatus: input.status,
         sku: input.search ? { name: { contains: input.search, mode: "insensitive" as const } } : undefined,
     };
     const [items, total] = await prisma.$transaction([
@@ -94,11 +95,12 @@ localMaterialRouter.post("/upload", (req, res, next) => {
     const assignment = materialAssignment.parse(req.body);
     const notes = z.string().trim().max(500, "备注不能超过 500 字").optional().parse(req.body.notes ?? undefined) || null;
     if (!req.file) throw fail("请选择视频文件");
-    await Promise.all([
+    const [sku] = await Promise.all([
         prisma.localVideoSku.findUniqueOrThrow({ where: { id: assignment.skuId } }),
         prisma.localVideoCategory.findUniqueOrThrow({ where: { id: assignment.categoryId } }),
     ]);
-    const fileKey = await uploadEngineFile(req.file);
+    // 素材按货号分目录存放：货号名作为总目录下的一级子文件夹名。
+    const fileKey = await uploadEngineFile(req.file, sku.name);
     let item;
     try {
         item = await prisma.localVideoMaterial.create({ data: {
@@ -131,6 +133,14 @@ localMaterialRouter.delete("/:id", async (req, res) => {
         deletedAt: new Date(), skuId: null, categoryId: null,
     } });
     res.json({ ok: true });
+});
+// 开发测试辅助：一键清空某货号下的全部素材（软删除），仅管理员可用。
+localMaterialRouter.delete("/by-sku/:skuId", requireAdmin, async (req, res) => {
+    const skuId = idInput.parse(req.params.skuId);
+    const result = await prisma.localVideoMaterial.updateMany({ where: { skuId, deletedAt: null }, data: {
+        deletedAt: new Date(), skuId: null, categoryId: null,
+    } });
+    res.json({ ok: true, count: result.count });
 });
 localMaterialRouter.get("/:id/preview", async (req, res) => {
     const item = await prisma.localVideoMaterial.findFirstOrThrow({ where: { id: idInput.parse(req.params.id), deletedAt: null } });

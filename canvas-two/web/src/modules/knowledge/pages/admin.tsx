@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { App, Button, Card, Col, Descriptions, Empty, Input, InputNumber, Popconfirm, Row, Select, Statistic, Table, Tabs, Tag } from "antd";
-import { FolderCog, LayoutDashboard, Settings2, Trash2 } from "lucide-react";
+import { App, Button, Empty, Input, InputNumber, Popconfirm, Select, Table, Tabs } from "antd";
+import { FileText, FolderCog, LayoutDashboard, MessageSquare, MessagesSquare, Settings2, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import { Field } from "@/components/ui/form-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatTile } from "@/components/ui/stat-tile";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { createKbCategory, deleteKbCategory, getKbAdminSettings, getKbAdminStats, listKbCategories, updateKbAdminSettings, updateKbCategory } from "../api";
 import type { KbCategory, KbChannelOption, KbSettings, KbStats } from "../types";
 
@@ -44,61 +48,64 @@ function SettingsTab() {
 
     if (!settings) return <Empty description="加载中…" />;
     return (
-        <Card size="small" title="模型配置">
-            <Descriptions column={1} className="max-w-2xl">
-                <Descriptions.Item label="对话模型渠道">
+        <section className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold tracking-tight">模型配置</h2>
+            <div className="mt-4 grid max-w-2xl gap-4 sm:grid-cols-2">
+                <Field label="对话模型渠道">
                     <Select
-                        className="w-72"
+                        className="w-full"
                         allowClear
                         placeholder="自动选择"
                         options={channelOptions}
                         value={settings.chatChannelId}
                         onChange={(value) => setSettings((current) => current && { ...current, chatChannelId: value || null, chatModel: null })}
                     />
-                </Descriptions.Item>
-                <Descriptions.Item label="对话模型">
+                </Field>
+                <Field label="对话模型">
                     <Select
-                        className="w-72"
+                        className="w-full"
                         allowClear
                         placeholder="自动选择"
                         options={modelOptions(settings.chatChannelId)}
                         value={settings.chatModel}
                         onChange={(value) => setSettings((current) => current && { ...current, chatModel: value || null })}
                     />
-                </Descriptions.Item>
-                <Descriptions.Item label="向量模型渠道">
+                </Field>
+                <Field label="向量模型渠道">
                     <Select
-                        className="w-72"
+                        className="w-full"
                         allowClear
                         placeholder="自动选择"
                         options={channelOptions}
                         value={settings.embedChannelId}
                         onChange={(value) => setSettings((current) => current && { ...current, embedChannelId: value || null, embedModel: null })}
                     />
-                </Descriptions.Item>
-                <Descriptions.Item label="向量模型">
+                </Field>
+                <Field label="向量模型">
                     <Select
-                        className="w-72"
+                        className="w-full"
                         allowClear
                         placeholder="自动选择"
                         options={modelOptions(settings.embedChannelId)}
                         value={settings.embedModel}
                         onChange={(value) => setSettings((current) => current && { ...current, embedModel: value || null })}
                     />
-                </Descriptions.Item>
-                <Descriptions.Item label="每日提问上限">
-                    <InputNumber
-                        min={0}
-                        max={1000}
-                        value={settings.dailyLimitPerUser}
-                        onChange={(value) => setSettings((current) => current && { ...current, dailyLimitPerUser: value ?? 50 })}
-                    />
-                    <span className="ml-2 text-xs text-muted-foreground">每人每天可提问次数，0 为不限</span>
-                </Descriptions.Item>
-            </Descriptions>
-            <Button type="primary" loading={saving} onClick={() => void save()} className="mt-2">保存配置</Button>
+                </Field>
+                <Field label="每日提问上限">
+                    <div className="flex items-center gap-2">
+                        <InputNumber
+                            min={0}
+                            max={1000}
+                            value={settings.dailyLimitPerUser}
+                            onChange={(value) => setSettings((current) => current && { ...current, dailyLimitPerUser: value ?? 50 })}
+                        />
+                        <span className="text-xs text-muted-foreground">每人每天可提问次数，0 为不限</span>
+                    </div>
+                </Field>
+            </div>
+            <Button type="primary" loading={saving} onClick={() => void save()} className="mt-4">保存配置</Button>
             <p className="mt-3 text-xs text-muted-foreground">留空则自动挑选第一个启用的 OpenAI 兼容渠道（向量模型优先匹配名称含 embed 的模型）。Gemini 格式渠道暂不支持。</p>
-        </Card>
+        </section>
     );
 }
 
@@ -142,8 +149,9 @@ function CategoriesTab() {
     };
 
     return (
-        <Card size="small" title="分类管理">
-            <div className="mb-4 flex max-w-md gap-2">
+        <section className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold tracking-tight">分类管理</h2>
+            <div className="mb-4 mt-4 flex max-w-md gap-2">
                 <Input placeholder="新分类名称" value={name} onChange={(event) => setName(event.target.value)} onPressEnter={() => void add()} />
                 <Button type="primary" onClick={() => void add()}>添加</Button>
             </div>
@@ -170,7 +178,7 @@ function CategoriesTab() {
                     },
                 ]}
             />
-        </Card>
+        </section>
     );
 }
 
@@ -189,30 +197,31 @@ function StatsTab() {
     const published = stats.postsByStatus.find((item) => item.status === "published")?._count || 0;
     return (
         <div className="space-y-4">
-            <Row gutter={16}>
-                <Col span={5}><Card size="small"><Statistic title="帖子总数" value={postTotal} /></Card></Col>
-                <Col span={5}><Card size="small"><Statistic title="已发布" value={published} /></Card></Col>
-                <Col span={5}><Card size="small"><Statistic title="向量片段" value={stats.chunks} /></Card></Col>
-                <Col span={4}><Card size="small"><Statistic title="AI 会话" value={stats.conversations} /></Card></Col>
-                <Col span={5}><Card size="small"><Statistic title="回答消息" value={stats.messages} /></Card></Col>
-            </Row>
-            <Row gutter={16}>
-                <Col span={5}><Card size="small"><Statistic title="答案有用" value={stats.feedback.useful} valueStyle={{ color: "#3f8600" }} /></Card></Col>
-                <Col span={5}><Card size="small"><Statistic title="答案无用" value={stats.feedback.useless} valueStyle={{ color: "#cf1322" }} /></Card></Col>
-                <Col span={5}><Card size="small"><Statistic title="零命中回答" value={stats.zeroHitAnswers} /></Card></Col>
-            </Row>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                <StatTile label="帖子总数" value={postTotal} icon={FileText} />
+                <StatTile label="已发布" value={published} icon={FileText} tone="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
+                <StatTile label="向量片段" value={stats.chunks} icon={LayoutDashboard} />
+                <StatTile label="AI 会话" value={stats.conversations} icon={MessageSquare} />
+                <StatTile label="回答消息" value={stats.messages} icon={MessagesSquare} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <StatTile label="答案有用" value={stats.feedback.useful} icon={ThumbsUp} tone="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
+                <StatTile label="答案无用" value={stats.feedback.useless} icon={ThumbsDown} tone="bg-red-500/10 text-red-600 dark:text-red-400" />
+                <StatTile label="零命中回答" value={stats.zeroHitAnswers} icon={MessageSquare} tone="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
+            </div>
             {!!stats.indexFailures.length && (
-                <Card size="small" title="索引失败的帖子">
-                    <ul className="space-y-1">
+                <section className="rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold tracking-tight">索引失败的帖子</h2>
+                    <ul className="mt-3 space-y-2">
                         {stats.indexFailures.map((item) => (
-                            <li key={item.id} className="text-sm">
-                                <Tag color="red">失败</Tag>
-                                {item.title}
-                                <span className="ml-2 text-xs text-muted-foreground">{item.indexError}</span>
+                            <li key={item.id} className="flex flex-wrap items-center gap-2 text-sm">
+                                <StatusBadge tone="error" label="失败" />
+                                <span className="min-w-0 truncate">{item.title}</span>
+                                <span className="text-xs text-muted-foreground">{item.indexError}</span>
                             </li>
                         ))}
                     </ul>
-                </Card>
+                </section>
             )}
         </div>
     );
@@ -221,15 +230,12 @@ function StatsTab() {
 export default function KnowledgeAdminPage() {
     return (
         <main className="flex h-full flex-col overflow-y-auto bg-background text-foreground">
-            <header className="flex items-center gap-3 border-b border-border px-6 py-4">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <Settings2 className="size-5" />
-                </span>
-                <div>
-                    <h1 className="text-base font-semibold tracking-tight">知识库管理</h1>
-                    <p className="text-xs text-muted-foreground">模型渠道、分类与运营统计（仅管理员可见）</p>
-                </div>
-            </header>
+            <PageHeader
+                icon={Settings2}
+                tone="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                title="知识库管理"
+                description="模型渠道、分类与运营统计（仅管理员可见）"
+            />
             <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-5">
                 <Tabs
                     items={[

@@ -11,12 +11,22 @@ vi.mock("./access.js", () => ({
     accessibleOwnerIds: mocks.accessibleOwnerIds,
     requireReadyUser: (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
 }));
-vi.mock("./db.js", () => ({ prisma: {
-    imageGenerationTask: { findUnique: mocks.findUnique, findUniqueOrThrow: mocks.findUniqueOrThrow, findMany: mocks.findMany, count: mocks.count, create: mocks.create, updateMany: mocks.updateMany },
+vi.mock("./db.js", () => {
+    const taskDelegate = { findUnique: mocks.findUnique, findUniqueOrThrow: mocks.findUniqueOrThrow, findMany: mocks.findMany, count: mocks.count, create: mocks.create, updateMany: mocks.updateMany };
+    // 路由在事务内执行写入，tx 上的方法委托给同一个 spy，已有断言无需改动。
+    const tx = {
+        imageGenerationTask: taskDelegate,
+        product: { updateMany: vi.fn().mockResolvedValue({ count: 0 }), update: vi.fn() },
+        detailPagePair: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        detailPageProject: { update: vi.fn() },
+    };
+    return { prisma: {
+    imageGenerationTask: taskDelegate,
+    $transaction: (callback: (value: unknown) => unknown) => callback(tx),
     modelChannel: { findUnique: mocks.channelFindUnique },
     canvasProject: { findUniqueOrThrow: mocks.canvasFindUniqueOrThrow },
     mediaFile: { findUniqueOrThrow: mocks.mediaFindUniqueOrThrow, findMany: mocks.mediaFindMany },
-} }));
+} }; });
 vi.mock("./media.js", () => ({ mediaResponse: (item: Record<string, unknown>) => ({ ...item, url: `/api/media/${item.id}/content`, thumbnailUrl: `/api/media/${item.id}/thumbnail` }) }));
 
 import { imageTaskRouter } from "./image-tasks.js";

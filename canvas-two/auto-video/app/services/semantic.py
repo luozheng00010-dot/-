@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import math
+import random
 import re
 import subprocess
 import wave
@@ -21,6 +22,84 @@ from app.utils import utils
 
 FPS = 30
 RATE = 48000
+
+# 可选的镜头拼接转场：交叉融合（xfade），前后镜头重叠融合，不插黑帧、不改变总时长。
+TRANSITION_SECONDS = 0.3
+XFADE_EFFECTS = {
+    "fade": "fade",
+    "slide_left": "slideleft",
+    "slide_right": "slideright",
+    "slide_up": "slideup",
+    "wipe_left": "wipeleft",
+    "circle_open": "circleopen",
+    "radial": "radial",
+    "pixelize": "pixelize",
+    "hblur": "hblur",
+}
+
+
+def plan_transitions(shots, clip_durations, transition="none", seconds=TRANSITION_SECONDS, fps=FPS):
+    """规划每个接缝的转场并返回 (extended_shots, junction_effects)。
+
+    junction_effects[i] 是 shots[i] 与 shots[i+1] 之间的 xfade 效果名，None 表示硬切。
+    shots[i+1]["transition"] 可单独覆盖该接缝的效果（"none" 强制硬切），缺省跟随全局
+    transition（含 shuffle 每段随机）。
+    帧数守恒：前 N-1 个镜头在源素材尾部充足时多取 seconds*fps 帧，xfade 重叠恰好
+    扣掉同样帧数，拼接总帧数与配音时间轴分毫不差；尾部不足的接缝自动退化为硬切。
+    """
+    if transition not in ("none", "shuffle", *XFADE_EFFECTS):
+        fail("转场特效无效")
+    def per_shot(i):
+        # render() 传入的是 Pydantic Shot 模型，单测里是纯 dict，两种都兼容。
+        shot = shots[i]
+        return shot.get("transition") if isinstance(shot, dict) else shot.transition
+
+    for i in range(len(shots)):
+        t = per_shot(i) or "none"
+        if t not in ("none", *XFADE_EFFECTS):
+            fail("镜头转场特效无效")
+    overlap = round(seconds * fps)
+    extended, junctions = [], []
+    for i, shot in enumerate(shots):
+        start, end, speed, frames = shot["sourceStart"], shot["sourceEnd"], shot["speed"], shot["frames"]
+        if end > clip_durations[i] + 0.0001:
+            fail("镜头超出源素材时长")
+        extra, effect = 0, None
+        if i < len(shots) - 1:
+            t = per_shot(i + 1) or transition
+            if t == "shuffle":
+                t = random.choice(list(XFADE_EFFECTS))
+            if t != "none" and end + seconds * speed <= clip_durations[i] + 0.0001:
+                end += seconds * speed
+                extra = overlap
+                effect = XFADE_EFFECTS[t]
+        extended.append({**shot, "sourceEnd": end, "frames": frames + extra})
+        if i < len(shots) - 1:
+            junctions.append(effect)
+    return extended, junctions
+
+
+def concat_with_transitions(paths, frame_counts, junctions, output, seconds=TRANSITION_SECONDS, fps=FPS):
+    """单条 ffmpeg filter_complex 链式 xfade（硬切接缝用 concat filter 桥接），一次编码出片。"""
+    if len(paths) == 1:
+        run(["-i", paths[0], "-c", "copy", output])
+        return
+    graph, prev, chain = [], "v0", frame_counts[0] / fps
+    for i in range(len(paths)):
+        graph.append(f"[{i}:v]settb=AVTB[v{i}]")
+    for i, effect in enumerate(junctions):
+        label = f"x{i}"
+        if effect:
+            graph.append(f"[{prev}][v{i + 1}]xfade=transition={effect}:duration={seconds}:offset={chain - seconds:.6f}[{label}]")
+            chain += frame_counts[i + 1] / fps - seconds
+        else:
+            graph.append(f"[{prev}][v{i + 1}]concat=n=2:v=1:a=0[{label}]")
+            chain += frame_counts[i + 1] / fps
+        prev = label
+    args = []
+    for path in paths:
+        args += ["-i", path]
+    run([*args, "-filter_complex", ";".join(graph), "-map", f"[{prev}]", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), output])
 
 
 def fail(message):
@@ -87,14 +166,14 @@ ANNOTATION_FRAME_MAX_EDGE = 640
 
 
 def annotation_frame_stamps(duration: float) -> tuple:
-    """按时长选择抽帧时间点：短素材相邻帧几乎相同，抽多了纯浪费视觉 token。"""
+    """按时长选择抽帧时间点（密度翻倍版）：1-2 秒素材动作快，多抽帧减少漏检。"""
     if duration <= 1:
-        return (0.3, 0.7)
+        return (0.2, 0.4, 0.6, 0.8)
     if duration <= 2:
-        return (0.2, 0.5, 0.8)
+        return (0.1, 0.26, 0.42, 0.58, 0.74, 0.9)
     if duration <= 4:
-        return (0.15, 0.4, 0.6, 0.85)
-    return (0.1, 0.3, 0.5, 0.7, 0.9)
+        return (0.08, 0.2, 0.32, 0.44, 0.56, 0.68, 0.8, 0.92)
+    return (0.06, 0.16, 0.26, 0.36, 0.46, 0.56, 0.66, 0.76, 0.86, 0.95)
 
 
 def _extract_annotation_frame(path, timestamp):
@@ -296,15 +375,19 @@ def render(body):
         else:
             options["bgm_file"] = ""
         width, height = {"9:16": (1080,1920), "16:9": (1920,1080), "1:1": (1080,1080)}[aspect]
-        paths, total = [], 0
-        for i, shot in enumerate(body["shots"]):
+        # 先校验镜头字段并读取源素材时长，供转场规划决定哪些镜头需要延长取片窗口。
+        clip_durations = []
+        for shot in body["shots"]:
             start, end, speed, frames = shot["sourceStart"], shot["sourceEnd"], shot["speed"], shot["frames"]
             if not all(math.isfinite(v) for v in (start,end,speed,frames)) or not 0.8 <= speed <= 1 or start < 0 or end <= start or frames <= 0 or int(frames) != frames or math.floor((end-start)/speed*FPS+1e-6) != frames:
                 fail("镜头区间、速度或帧数无效")
+            with VideoFileClip(str(source(shot["fileKey"])), audio=False) as clip:
+                clip_durations.append(clip.duration)
+        shots, junctions = plan_transitions(body["shots"], clip_durations, options.get("video_transition", "none"))
+        paths, total, frame_counts = [], 0, []
+        for i, shot in enumerate(shots):
+            start, end, speed, frames = shot["sourceStart"], shot["sourceEnd"], shot["speed"], shot["frames"]
             path = source(shot["fileKey"])
-            with VideoFileClip(str(path), audio=False) as clip:
-                if end > clip.duration + .0001:
-                    fail("镜头超出源素材时长")
             scale = f"scale={width}:{height}:force_original_aspect_ratio="
             fit = scale + (f"increase,crop={width}:{height}" if options.get("video_fit_mode") == "cover" else f"decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2")
             out = folder / f"shot-{i}.mp4"
@@ -312,26 +395,31 @@ def render(body):
             with VideoFileClip(str(out), audio=False) as rendered:
                 if abs(round(rendered.duration*FPS)-frames) != 0:
                     fail("镜头实际输出帧数不足，禁止冻结补帧，请调整截取区间")
-            paths.append(out); total += frames
-        if not paths or total != round(len(pcm(audio_path))/2/RATE*FPS):
+            paths.append(out); total += frames; frame_counts.append(frames)
+        # 转场重叠会扣掉 overlap*转场接缝数 帧；帧数守恒保证 expected 仍等于配音帧数。
+        expected = total - round(TRANSITION_SECONDS * FPS) * sum(1 for effect in junctions if effect)
+        if not paths or expected != round(len(pcm(audio_path))/2/RATE*FPS):
             fail("镜头时间轴没有完整覆盖配音")
         cursor = 0
         for unit in body["units"]:
             if unit["startFrame"] != cursor or unit["endFrame"] <= cursor:
                 fail("字幕与语义时间轴不连续")
             cursor = unit["endFrame"]
-        if cursor != total:
+        if cursor != expected:
             fail("语义时间轴与镜头长度不一致")
-        concat = folder / "concat.txt"
-        concat.write_text("".join(f"file '{p.name}'\n" for p in paths), encoding="utf-8")
         combined = folder / "combined.mp4"
-        run(["-f", "concat", "-safe", "1", "-i", concat, "-c", "copy", combined])
+        if any(junctions):
+            concat_with_transitions(paths, frame_counts, junctions, combined)
+        else:
+            concat = folder / "concat.txt"
+            concat.write_text("".join(f"file '{p.name}'\n" for p in paths), encoding="utf-8")
+            run(["-f", "concat", "-safe", "1", "-i", concat, "-c", "copy", combined])
         subtitle = folder / "captions.srt"
         subtitle.write_text("\n\n".join(f"{i+1}\n{timestamp(u['startFrame'])} --> {timestamp(u['endFrame'])}\n{u['text']}" for i,u in enumerate(body["units"])), encoding="utf-8")
         params = VideoParams(video_subject="语义剪辑", **options)
         ok = video.generate_video(str(combined), str(audio_path), str(subtitle) if params.subtitle_enabled else "", str(folder / "output.mp4"), params)
         with VideoFileClip(str(folder / "output.mp4"), audio=False) as result:
-            if abs(result.duration - total/FPS) > 1/FPS + .001:
+            if abs(result.duration - expected/FPS) > 1/FPS + .001:
                 fail("最终合成时长不一致，请检查渲染配置")
         return {"artifactKey": body["requestId"], "frames": total, "warnings": [] if ok else ["背景音乐混合失败，输出仅含旁白"]}
     return cached("render", body, build)

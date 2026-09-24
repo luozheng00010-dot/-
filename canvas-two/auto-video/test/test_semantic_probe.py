@@ -45,12 +45,12 @@ def _decode_frame(data_url: str) -> Image.Image:
 
 class SemanticProbeTests(unittest.TestCase):
     def test_frame_stamps_follow_duration_buckets(self):
-        self.assertEqual(len(semantic.annotation_frame_stamps(0.5)), 2)
-        self.assertEqual(len(semantic.annotation_frame_stamps(1.0)), 2)
-        self.assertEqual(len(semantic.annotation_frame_stamps(1.5)), 3)
-        self.assertEqual(len(semantic.annotation_frame_stamps(2.0)), 3)
-        self.assertEqual(len(semantic.annotation_frame_stamps(3.5)), 4)
-        self.assertEqual(len(semantic.annotation_frame_stamps(5.0)), 5)
+        self.assertEqual(len(semantic.annotation_frame_stamps(0.5)), 4)
+        self.assertEqual(len(semantic.annotation_frame_stamps(1.0)), 4)
+        self.assertEqual(len(semantic.annotation_frame_stamps(1.5)), 6)
+        self.assertEqual(len(semantic.annotation_frame_stamps(2.0)), 6)
+        self.assertEqual(len(semantic.annotation_frame_stamps(3.5)), 8)
+        self.assertEqual(len(semantic.annotation_frame_stamps(5.0)), 10)
 
     def test_probe_extracts_jpeg_frames_capped_at_640(self):
         with tempfile.TemporaryDirectory() as root:
@@ -61,9 +61,9 @@ class SemanticProbeTests(unittest.TestCase):
             self.assertEqual(result["width"], 1280)
             self.assertEqual(result["height"], 720)
             self.assertAlmostEqual(result["duration"], 1.5, places=1)
-            # 1.5 秒素材只需 3 帧，不再抽满 5 帧。
-            self.assertEqual(len(result["frames"]), 3)
-            self.assertEqual(result["thumbnail"], result["frames"][1])
+            # 1.5 秒素材按 6 帧抽取（密度翻倍后的档位）。
+            self.assertEqual(len(result["frames"]), 6)
+            self.assertEqual(result["thumbnail"], result["frames"][3])
             for data_url in result["frames"]:
                 with _decode_frame(data_url) as image:
                     self.assertEqual(image.format, "JPEG")
@@ -75,7 +75,7 @@ class SemanticProbeTests(unittest.TestCase):
             _make_video(video, duration=0.8)
             with patch.object(semantic, "source", return_value=video):
                 result = semantic.probe("key")
-            self.assertEqual(len(result["frames"]), 2)
+            self.assertEqual(len(result["frames"]), 4)
 
     def test_corrupt_video_rejected(self):
         with tempfile.TemporaryDirectory() as root:

@@ -41,7 +41,7 @@ describe("共享本地视频素材库", () => {
         mocks.materialGet.mockResolvedValue(null);
         mocks.upload.mockResolvedValue("immutable.mp4");
         mocks.cleanup.mockResolvedValue(undefined);
-        mocks.skuFind.mockResolvedValue({ id: sku });
+        mocks.skuFind.mockResolvedValue({ id: sku, name: "ABC-001" });
         mocks.categoryFind.mockResolvedValue({ id: category });
         mocks.upstream.mockResolvedValue({ statusCode: 200, body: { text: async () => '{"data":{"task_id":"task"},"status":200}' } });
     });
@@ -68,7 +68,7 @@ describe("共享本地视频素材库", () => {
             .field("skuId", sku).field("categoryId", category)
             .attach("file", Buffer.from("video"), fileName);
         expect(result.status).toBe(201);
-        expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({ originalname: fileName }));
+        expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({ originalname: fileName }), "ABC-001");
         expect(mocks.materialCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fileName }) }));
         expect(result.body.fileName).toBe(fileName);
     });

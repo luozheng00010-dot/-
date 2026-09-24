@@ -87,6 +87,42 @@ class MaterialStorageTests(unittest.TestCase):
         self.assertEqual(material_upload.find_material_file("../x.mp4"), "")
         self.assertEqual(material_upload.find_material_file(""), "")
 
+    def test_sku_subfolder_upload_and_lookup(self):
+        """新素材落在 <总目录>/<货号>/ 下，find_material_file 能按 fileKey 找回。"""
+        import subprocess
+
+        from app.utils import utils
+
+        with tempfile.TemporaryDirectory() as root:
+            material_upload.update_storage_dir(root)
+            clip = os.path.join(root, "clip.mp4")
+            subprocess.run(
+                [
+                    utils.get_ffmpeg_binary(), "-y", "-hide_banner", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=c=red:s=320x568:r=30:d=1.0",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", clip,
+                ],
+                check=True,
+            )
+            with open(clip, "rb") as stream:
+                key = material_upload.save_material_upload("clip.mp4", stream, "GJNN577")
+            nested = os.path.join(root, "GJNN577", key)
+            self.assertTrue(os.path.isfile(nested))
+            self.assertFalse(os.path.isfile(os.path.join(root, key)))
+            self.assertEqual(material_upload.find_material_file(key), nested)
+            # 历史扁平文件仍然能在根目录命中。
+            flat = os.path.join(root, "a" * 32 + ".mp4")
+            with open(clip, "rb") as src, open(flat, "wb") as dst:
+                dst.write(src.read())
+            self.assertEqual(material_upload.find_material_file("a" * 32 + ".mp4"), flat)
+
+    def test_sku_subfolder_rejects_unsafe_names(self):
+        for bad in ("../x", "a/b", "a\\b", "CON", "x" * 100, "a<b"):
+            with self.assertRaises(material_upload.MaterialUploadError):
+                material_upload.sanitize_material_folder(bad)
+        self.assertEqual(material_upload.sanitize_material_folder(""), "")
+        self.assertEqual(material_upload.sanitize_material_folder(" GJNN-577_测 "), "GJNN-577_测")
+
 
 if __name__ == "__main__":
     unittest.main()

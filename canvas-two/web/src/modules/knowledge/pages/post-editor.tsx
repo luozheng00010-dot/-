@@ -122,73 +122,76 @@ export default function KnowledgePostEditorPage() {
     };
 
     return (
-        <main className="flex h-full flex-col overflow-y-auto bg-background text-foreground">
-            <header className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-4">
-                <Button icon={<ArrowLeft className="size-4" />} onClick={() => navigate(-1)}>返回</Button>
+        <main className="flex h-full flex-col overflow-hidden bg-background text-foreground">
+            <header className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-3.5">
+                <Button type="text" icon={<ArrowLeft className="size-4" />} onClick={() => navigate(-1)}>返回</Button>
                 <h1 className="text-base font-semibold tracking-tight">{editing ? "编辑帖子" : "发布新帖"}</h1>
-                <span className="text-xs text-muted-foreground">支持 Markdown 与图片，发布后自动切分建索引供 AI 检索</span>
+                <span className="hidden text-xs text-muted-foreground md:inline">支持 Markdown 与图片，发布后自动切分建索引供 AI 检索</span>
                 <div className="ml-auto flex shrink-0 items-center gap-2">
                     <Button icon={<Save className="size-4" />} loading={saving} disabled={!valid} onClick={() => void save("draft")}>存为草稿</Button>
                     <Button type="primary" icon={<Send className="size-4" />} loading={saving} disabled={!valid} onClick={() => void save("published")}>{status === "published" && editing ? "保存修改" : "发布"}</Button>
                 </div>
             </header>
 
-            <Spin spinning={loading}>
-                <div className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-6 py-5">
-                    <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 overflow-y-auto">
+                <Spin spinning={loading}>
+                    <div className="mx-auto w-full max-w-4xl px-6 py-6">
                         <Input
+                            variant="borderless"
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
                             placeholder="标题：一句话说清这篇内容解决什么问题"
-                            className="min-w-60 flex-1"
+                            className="!px-0 text-xl font-semibold"
                             maxLength={120}
                             showCount
                         />
-                        <Segmented
-                            value={type}
-                            options={[{ value: "insight", label: "心得" }, { value: "workflow", label: "流程" }, { value: "qa", label: "问答" }]}
-                            onChange={(value) => setType(value as KbPostType)}
-                        />
-                        <Select
-                            allowClear
-                            placeholder="分类"
-                            className="w-40"
-                            value={categoryId}
-                            options={categories.map((item) => ({ value: item.id, label: item.name }))}
-                            onChange={(value) => setCategoryId(value)}
-                        />
-                        <Select
-                            mode="tags"
-                            placeholder="标签"
-                            className="min-w-44"
-                            value={tags}
-                            maxCount={10}
-                            onChange={(value) => setTags(value as string[])}
-                            tokenSeparators={[",", "，", " "]}
-                        />
-                    </div>
+                        <div className="mb-5 mt-2 flex flex-wrap items-center gap-3 border-b border-border pb-5">
+                            <Segmented
+                                value={type}
+                                options={[{ value: "insight", label: "心得" }, { value: "workflow", label: "流程" }, { value: "qa", label: "问答" }]}
+                                onChange={(value) => setType(value as KbPostType)}
+                            />
+                            <Select
+                                allowClear
+                                placeholder="分类"
+                                className="w-40"
+                                value={categoryId}
+                                options={categories.map((item) => ({ value: item.id, label: item.name }))}
+                                onChange={(value) => setCategoryId(value)}
+                            />
+                            <Select
+                                mode="tags"
+                                placeholder="标签"
+                                className="min-w-44 flex-1"
+                                value={tags}
+                                maxCount={10}
+                                onChange={(value) => setTags(value as string[])}
+                                tokenSeparators={[",", "，", " "]}
+                            />
+                        </div>
 
-                    <div
-                        data-color-mode={theme}
-                        onPaste={(event) => {
-                            const files = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/"));
-                            if (!files.length) return;
-                            event.preventDefault();
-                            void insertImages(files);
-                        }}
-                    >
-                        <MDEditor
-                            value={content}
-                            onChange={(value) => setContent(value || "")}
-                            height={540}
-                            preview="live"
-                            extraCommands={[imageCommand, commands.fullscreen]}
-                            textareaProps={{ placeholder: "用 Markdown 记录：背景、步骤、踩坑点、结论… 支持直接粘贴截图" }}
-                        />
+                        <div
+                            data-color-mode={theme}
+                            onPaste={(event) => {
+                                const files = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/"));
+                                if (!files.length) return;
+                                event.preventDefault();
+                                void insertImages(files);
+                            }}
+                        >
+                            <MDEditor
+                                value={content}
+                                onChange={(value) => setContent(value || "")}
+                                height={540}
+                                preview="live"
+                                extraCommands={[imageCommand, commands.fullscreen]}
+                                textareaProps={{ placeholder: "用 Markdown 记录：背景、步骤、踩坑点、结论… 支持直接粘贴截图" }}
+                            />
+                        </div>
+                        <p className="mt-3 text-xs text-muted-foreground">图片上传到服务器后插入正文；从正文删除图片并保存后，服务器上的对应文件会自动清理。</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">图片上传到服务器后插入正文；从正文删除图片并保存后，服务器上的对应文件会自动清理。</p>
-                </div>
-            </Spin>
+                </Spin>
+            </div>
 
             <input
                 ref={fileInputRef}

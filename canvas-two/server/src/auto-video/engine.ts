@@ -16,9 +16,10 @@ export async function semanticEngine<T>(path: string, body: unknown): Promise<T>
     return data as T;
 }
 
-export async function uploadEngineFile(file: Express.Multer.File): Promise<string> {
+export async function uploadEngineFile(file: Express.Multer.File, folder?: string): Promise<string> {
     const form = new FormData();
     form.append("file", new Blob([new Uint8Array(file.buffer)], { type: "application/octet-stream" }), file.originalname);
+    if (folder?.trim()) form.append("folder", folder.trim().slice(0, 80));
     let upstream;
     try {
         upstream = await request(`${base}/api/v1/library-videos`, { method: "POST", dispatcher, headers: { "x-api-key": env.AUTO_VIDEO_API_KEY }, body: form });

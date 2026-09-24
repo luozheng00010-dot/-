@@ -11,3 +11,4 @@ pyyaml==6.0.3
 requests==2.33.1
 packaging==24.2
 socksio==1.0.0
+pyJianYingDraft==0.3.0

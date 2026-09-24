@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clapperboard, LoaderCircle, Sparkles, Upload } from "lucide-react";
+import { Clapperboard, Film, FolderOpen, LoaderCircle, Settings2, Sparkles, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/use-auth-store";
 import { availableCategories, listLibraryOptions, listLocalVideos, type LibraryOption, type LocalVideo } from "@/services/local-materials";
-import { Alert, App, Button, Card, ColorPicker, Empty, Input, InputNumber, Segmented, Select, Slider, Switch, Tag, Typography, Upload as AntUpload } from "antd";
+import { App, Button, ColorPicker, Input, InputNumber, Segmented, Select, Slider, Switch, Upload as AntUpload } from "antd";
+import { Field, FormSection } from "@/components/ui/form-section";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 
 import {
     checkAutoVideoHealth,
@@ -22,6 +25,19 @@ const ASPECT_OPTIONS = [
     { label: "横屏 16:9", value: "16:9" },
     { label: "方形 1:1", value: "1:1" },
 ];
+const TRANSITION_OPTIONS = [
+    { label: "无（硬切）", value: "none" },
+    { label: "溶解", value: "fade" },
+    { label: "左滑", value: "slide_left" },
+    { label: "右滑", value: "slide_right" },
+    { label: "上滑", value: "slide_up" },
+    { label: "左擦除", value: "wipe_left" },
+    { label: "圆形展开", value: "circle_open" },
+    { label: "径向", value: "radial" },
+    { label: "像素化", value: "pixelize" },
+    { label: "模糊", value: "hblur" },
+    { label: "每段随机", value: "shuffle" },
+];
 const SUBTITLE_POSITIONS = [
     { label: "底部", value: "bottom" },
     { label: "居中", value: "center" },
@@ -29,11 +45,12 @@ const SUBTITLE_POSITIONS = [
     { label: "自定义", value: "custom" },
 ];
 const DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural";
+const AMBER_TONE = "bg-amber-500/10 text-amber-600 dark:text-amber-400";
 
-const planStatusMeta: Record<string, { label: string; color: string }> = {
-    queued: { label: "匹配中", color: "processing" },
-    ready: { label: "待确认", color: "gold" },
-    failed: { label: "失败", color: "red" },
+const planStatusMeta: Record<string, { label: string; tone: StatusTone }> = {
+    queued: { label: "匹配中", tone: "processing" },
+    ready: { label: "待确认", tone: "warning" },
+    failed: { label: "失败", tone: "error" },
 };
 
 function hexOf(color: { toHexString: () => string }) {
@@ -67,6 +84,7 @@ export default function AutoVideoPage() {
     const [videoScript, setVideoScript] = useState("");
     const [videoAspect, setVideoAspect] = useState("9:16");
     const [fitMode, setFitMode] = useState<"cover" | "contain">("cover");
+    const [videoTransition, setVideoTransition] = useState("none");
     const [videoCount, setVideoCount] = useState(1);
     // 配音
     const [voiceName, setVoiceName] = useState(DEFAULT_VOICE);
@@ -189,7 +207,7 @@ export default function AutoVideoPage() {
         setSubmitting(true);
         try {
             const input = { script: videoScript, skuId: localSkuId, categoryIds: localCategoryIds, count: videoCount, voiceName, voiceRate,
-                options: { video_aspect: videoAspect, video_fit_mode: fitMode, subtitle_enabled: subtitleEnabled, subtitle_position: subtitlePosition,
+                options: { video_aspect: videoAspect, video_fit_mode: fitMode, video_transition: videoTransition, subtitle_enabled: subtitleEnabled, subtitle_position: subtitlePosition,
                     font_name: fontName, font_size: fontSize, text_fore_color: textForeColor, stroke_color: strokeColor, stroke_width: strokeWidth,
                     custom_position: customPosition, voice_volume: voiceVolume, bgm_type: bgmType || "none", bgm_file: bgmFile.split(/[\\/]/).pop() || "", bgm_volume: bgmVolume } };
             const body = JSON.stringify(input);
@@ -203,194 +221,207 @@ export default function AutoVideoPage() {
         }
     };
 
-    const sectionTitle = (text: string) => <Typography.Text strong className="text-sm">{text}</Typography.Text>;
+    const healthBadge =
+        health === "checking" ? <StatusBadge tone="muted" label="检测服务中…" pulse /> :
+        health === "up" ? <StatusBadge tone="success" label="引擎运行中" /> :
+        <StatusBadge tone="error" label="引擎未启动" />;
 
     return (
-        <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center gap-2 border-b px-4 py-2 text-sm font-medium">
-                <Clapperboard className="size-4" />
-                自动剪辑
-                <span className="text-muted-foreground hidden text-xs md:inline">用本地素材库按文案语义匹配画面</span>
-                <div className="ml-auto flex items-center gap-2">
-                    <Link to="/auto-video/materials" className="text-xs">本地素材库</Link>
-                    <Link to="/auto-video/plans" className="text-xs">剪辑方案</Link>
-                    {isAdmin && <Link to="/auto-video/admin" className="text-xs">管理设置</Link>}
-                    {health === "checking" && <Tag>检测服务中…</Tag>}
-                    {health === "up" && <Tag color="green">引擎运行中</Tag>}
-                    {health === "down" && <Tag color="red">引擎未启动</Tag>}
-                </div>
-            </div>
+        <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+            <PageHeader
+                icon={Clapperboard}
+                tone={AMBER_TONE}
+                title="自动剪辑"
+                description="用本地素材库按文案语义匹配画面"
+                actions={<>
+                    <Link to="/auto-video/materials"><Button type="text" icon={<FolderOpen className="size-4" />}>素材库</Button></Link>
+                    <Link to="/auto-video/plans"><Button type="text" icon={<Film className="size-4" />}>剪辑方案</Button></Link>
+                    {isAdmin && <Link to="/auto-video/admin"><Button type="text" icon={<Settings2 className="size-4" />}>管理设置</Button></Link>}
+                    {healthBadge}
+                </>}
+            />
 
             {health === "down" && (
-                <Alert
-                    className="mx-4 mt-3"
-                    type="warning"
-                    showIcon
-                    message="自动剪辑引擎未启动"
-                    description="在项目根目录执行 npm run dev 或 npm run dev:auto-video 启动引擎后重试。"
-                />
+                <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                    自动剪辑引擎未启动：在项目根目录执行 npm run dev 或 npm run dev:auto-video 启动引擎后重试。
+                </div>
             )}
 
-            <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4">
+            <div className="flex min-h-0 flex-1">
                 {/* 左侧：方案参数 */}
-                <Card size="small" className="w-[420px] shrink-0 overflow-y-auto" styles={{ body: { display: "flex", flexDirection: "column", gap: 14 } }}>
-                    {sectionTitle("文案")}
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">最终原文（匹配时不会改写或删句）</Typography.Text>
-                        <Input.TextArea rows={6} placeholder="粘贴你的成片文案，系统将理解每句话并匹配对应画面" value={videoScript} onChange={(event) => setVideoScript(event.target.value)} />
-                    </div>
+                <aside className="flex w-[440px] shrink-0 flex-col border-r border-border bg-card">
+                    <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+                        <FormSection step={1} title="文案" description="最终原文，匹配时不会改写或删句">
+                            <Input.TextArea rows={6} placeholder="粘贴你的成片文案，系统将理解每句话并匹配对应画面" value={videoScript} onChange={(event) => setVideoScript(event.target.value)} />
+                        </FormSection>
 
-                    {sectionTitle("素材范围")}
-                    <div className="flex flex-col gap-2 rounded-md border border-dashed p-2">
-                        <div className="flex items-center justify-between"><Link to="/auto-video/materials">管理本地素材库</Link><Button size="small" onClick={() => setLocalRevision((value) => value + 1)}>刷新</Button></div>
-                        <Select placeholder="选择货号（必填）" aria-label="素材货号" showSearch optionFilterProp="label" value={localSkuId} options={localSkus.map((item) => ({ label: item.name, value: item.id }))} onChange={(id) => { setLocalSkuId(id); setLocalCategoryIds([]); setLocalCategories([]); setLocalVideos([]); setLocalTotal(0); setLocalPage(1); }} />
-                        <Select mode="multiple" placeholder="选择分类（可多选，必填）" aria-label="素材分类" disabled={!localSkuId} value={localCategoryIds} optionFilterProp="label" options={localCategories.map((item) => ({ label: item.name, value: item.id }))} onChange={(ids) => { setLocalCategoryIds(ids); setLocalTotal(0); setLocalPage(1); }} />
-                        <Button size="small" disabled={!localCategories.length} onClick={() => { setLocalCategoryIds(localCategories.map((item) => item.id)); setLocalPage(1); }}>选择该货号全部有素材分类</Button>
-                        <Typography.Text type="secondary" className="text-xs">{localLoading ? "加载候选视频…" : `匹配 ${localTotal} 个视频，作为候选池参与剪辑`}</Typography.Text>
-                        {localError && <Typography.Text type="danger" className="text-xs">{localError}</Typography.Text>}
-                        {!localLoading && localSkuId && localCategoryIds.length > 0 && !localTotal && !localError && <Typography.Text type="secondary" className="text-xs">所选分类下没有视频，请到素材库上传。</Typography.Text>}
-                        <div className="max-h-28 overflow-y-auto text-xs">{localVideos.map((item) => <div key={item.id} className="truncate" title={item.fileName}>{item.category.name} · {item.fileName}</div>)}</div>
-                        {localTotal > 20 && <div className="flex items-center justify-between"><Button size="small" disabled={localPage === 1 || localLoading} onClick={() => setLocalPage((page) => page - 1)}>上一页</Button><span>{localPage} / {Math.ceil(localTotal / 20)}</span><Button size="small" disabled={localPage * 20 >= localTotal || localLoading} onClick={() => setLocalPage((page) => page + 1)}>下一页</Button></div>}
-                    </div>
-
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">画面比例 / 适应方式</Typography.Text>
-                        <div className="flex gap-2">
-                            <Segmented className="flex-1" options={ASPECT_OPTIONS} value={videoAspect} onChange={(value) => setVideoAspect(value as string)} />
-                            <Segmented options={[{ label: "填充", value: "cover" }, { label: "完整", value: "contain" }]} value={fitMode} onChange={(value) => setFitMode(value as "cover" | "contain")} />
-                        </div>
-                    </div>
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">成片数量（同一文案的不同画面编排）</Typography.Text>
-                        <InputNumber className="w-full" size="small" min={1} max={5} value={videoCount} onChange={(value) => setVideoCount(value ?? 1)} />
-                    </div>
-
-                    {sectionTitle("配音")}
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">音色</Typography.Text>
-                        <Select className="w-full" size="small" showSearch optionFilterProp="label" options={voiceOptions} value={voiceName} onChange={setVoiceName} notFoundContent="加载中…" />
-                    </div>
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">语速 {voiceRate.toFixed(1)}x</Typography.Text>
-                        <Slider min={0.5} max={2} step={0.1} value={voiceRate} onChange={setVoiceRate} />
-                    </div>
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">音量 {Math.round(voiceVolume * 100)}%</Typography.Text>
-                        <Slider min={0} max={2} step={0.1} value={voiceVolume} onChange={setVoiceVolume} />
-                    </div>
-
-                    {sectionTitle("背景音乐")}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <Typography.Text type="secondary" className="mb-1 block text-xs">音乐来源</Typography.Text>
-                            <Select
-                                className="w-full"
-                                size="small"
-                                value={bgmType}
-                                onChange={setBgmType}
-                                options={[
-                                    { label: "随机", value: "random" },
-                                    { label: "无", value: "none" },
-                                    { label: "指定曲目", value: "custom" },
-                                ]}
-                            />
-                        </div>
-                        {bgmType === "custom" && (
-                            <div>
-                                <div className="mb-1 flex items-center justify-between">
-                                    <Typography.Text type="secondary" className="text-xs">曲目</Typography.Text>
-                                    <AntUpload
-                                        showUploadList={false}
-                                        accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma"
-                                        beforeUpload={(file) => {
-                                            void onUploadMusic(file);
-                                            return false;
-                                        }}
-                                    >
-                                        <Button size="small" type="text" icon={uploadingMusic ? <LoaderCircle className="size-3 animate-spin" /> : <Upload className="size-3" />} />
-                                    </AntUpload>
+                        <FormSection step={2} title="素材范围" description="候选池参与剪辑">
+                            <div className="space-y-2.5 rounded-lg border border-dashed border-border p-3">
+                                <div className="flex items-center justify-between">
+                                    <Link to="/auto-video/materials" className="text-xs hover:text-primary">管理本地素材库</Link>
+                                    <Button size="small" type="text" onClick={() => setLocalRevision((value) => value + 1)}>刷新</Button>
                                 </div>
-                                <Select className="w-full" size="small" showSearch optionFilterProp="label" value={bgmFile || undefined} onChange={setBgmFile}
-                                    options={musics.map((music) => ({ label: music.name, value: music.file }))} placeholder="选择/上传 BGM" notFoundContent="无曲目" />
+                                <Select className="w-full" placeholder="选择货号（必填）" aria-label="素材货号" showSearch optionFilterProp="label" value={localSkuId} options={localSkus.map((item) => ({ label: item.name, value: item.id }))} onChange={(id) => { setLocalSkuId(id); setLocalCategoryIds([]); setLocalCategories([]); setLocalVideos([]); setLocalTotal(0); setLocalPage(1); }} />
+                                <Select className="w-full" mode="multiple" placeholder="选择分类（可多选，必填）" aria-label="素材分类" disabled={!localSkuId} value={localCategoryIds} optionFilterProp="label" options={localCategories.map((item) => ({ label: item.name, value: item.id }))} onChange={(ids) => { setLocalCategoryIds(ids); setLocalTotal(0); setLocalPage(1); }} />
+                                <Button size="small" disabled={!localCategories.length} onClick={() => { setLocalCategoryIds(localCategories.map((item) => item.id)); setLocalPage(1); }}>选择该货号全部有素材分类</Button>
+                                <p className="text-xs text-muted-foreground">{localLoading ? "加载候选视频…" : `匹配 ${localTotal} 个视频，作为候选池参与剪辑`}</p>
+                                {localError && <p className="text-xs text-red-600 dark:text-red-400">{localError}</p>}
+                                {!localLoading && localSkuId && localCategoryIds.length > 0 && !localTotal && !localError && <p className="text-xs text-muted-foreground">所选分类下没有视频，请到素材库上传。</p>}
+                                <div className="max-h-28 space-y-1 overflow-y-auto text-xs text-muted-foreground">{localVideos.map((item) => <div key={item.id} className="truncate" title={item.fileName}>{item.category.name} · {item.fileName}</div>)}</div>
+                                {localTotal > 20 && (
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <Button size="small" disabled={localPage === 1 || localLoading} onClick={() => setLocalPage((page) => page - 1)}>上一页</Button>
+                                        <span>{localPage} / {Math.ceil(localTotal / 20)}</span>
+                                        <Button size="small" disabled={localPage * 20 >= localTotal || localLoading} onClick={() => setLocalPage((page) => page + 1)}>下一页</Button>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">音乐音量 {Math.round(bgmVolume * 100)}%</Typography.Text>
-                        <Slider min={0} max={1} step={0.05} value={bgmVolume} onChange={setBgmVolume} />
+                        </FormSection>
+
+                        <FormSection step={3} title="画面">
+                            <Field label="画面比例 / 适应方式">
+                                <div className="flex gap-2">
+                                    <Segmented className="flex-1" options={ASPECT_OPTIONS} value={videoAspect} onChange={(value) => setVideoAspect(value as string)} />
+                                    <Segmented options={[{ label: "填充", value: "cover" }, { label: "完整", value: "contain" }]} value={fitMode} onChange={(value) => setFitMode(value as "cover" | "contain")} />
+                                </div>
+                            </Field>
+                            <Field label="转场特效（镜头拼接处，交叉融合 0.3 秒）">
+                                <Select className="w-full" value={videoTransition} options={TRANSITION_OPTIONS} onChange={(value) => setVideoTransition(value)} />
+                            </Field>
+                            <Field label="成片数量（同一文案的不同画面编排）">
+                                <InputNumber className="w-full" min={1} max={5} value={videoCount} onChange={(value) => setVideoCount(value ?? 1)} />
+                            </Field>
+                        </FormSection>
+
+                        <FormSection step={4} title="配音">
+                            <Field label="音色">
+                                <Select className="w-full" showSearch optionFilterProp="label" options={voiceOptions} value={voiceName} onChange={setVoiceName} notFoundContent="加载中…" />
+                            </Field>
+                            <Field label={`语速 ${voiceRate.toFixed(1)}x`}>
+                                <Slider min={0.5} max={2} step={0.1} value={voiceRate} onChange={setVoiceRate} />
+                            </Field>
+                            <Field label={`音量 ${Math.round(voiceVolume * 100)}%`}>
+                                <Slider min={0} max={2} step={0.1} value={voiceVolume} onChange={setVoiceVolume} />
+                            </Field>
+                        </FormSection>
+
+                        <FormSection step={5} title="背景音乐">
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="音乐来源">
+                                    <Select
+                                        className="w-full"
+                                        value={bgmType}
+                                        onChange={setBgmType}
+                                        options={[
+                                            { label: "随机", value: "random" },
+                                            { label: "无", value: "none" },
+                                            { label: "指定曲目", value: "custom" },
+                                        ]}
+                                    />
+                                </Field>
+                                {bgmType === "custom" && (
+                                    <Field label="曲目">
+                                        <div className="flex gap-1.5">
+                                            <Select className="min-w-0 flex-1" showSearch optionFilterProp="label" value={bgmFile || undefined} onChange={setBgmFile}
+                                                options={musics.map((music) => ({ label: music.name, value: music.file }))} placeholder="选择/上传 BGM" notFoundContent="无曲目" />
+                                            <AntUpload
+                                                showUploadList={false}
+                                                accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma"
+                                                beforeUpload={(file) => {
+                                                    void onUploadMusic(file);
+                                                    return false;
+                                                }}
+                                            >
+                                                <Button icon={uploadingMusic ? <LoaderCircle className="size-4 animate-spin" /> : <Upload className="size-4" />} />
+                                            </AntUpload>
+                                        </div>
+                                    </Field>
+                                )}
+                            </div>
+                            <Field label={`音乐音量 ${Math.round(bgmVolume * 100)}%`}>
+                                <Slider min={0} max={1} step={0.05} value={bgmVolume} onChange={setBgmVolume} />
+                            </Field>
+                        </FormSection>
+
+                        <FormSection step={6} title="字幕">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">启用字幕</span>
+                                <Switch checked={subtitleEnabled} onChange={(checked) => setSubtitleEnabled(checked)} />
+                            </div>
+                            <Field label="位置">
+                                <Segmented className="w-full" options={SUBTITLE_POSITIONS} value={subtitlePosition} onChange={(value) => setSubtitlePosition(value as string)} disabled={!subtitleEnabled} />
+                            </Field>
+                            {subtitleEnabled && subtitlePosition === "custom" && (
+                                <Field label={`自定义位置 ${customPosition}%`}>
+                                    <Slider min={0} max={100} step={1} value={customPosition} onChange={setCustomPosition} />
+                                </Field>
+                            )}
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="字体">
+                                    <Select className="w-full" value={fontName} onChange={setFontName} options={fonts.map((name) => ({ label: name.replace(/\.(ttf|ttc|otf)$/i, ""), value: name }))} disabled={!subtitleEnabled} />
+                                </Field>
+                                <Field label="字号 / 描边宽">
+                                    <div className="flex gap-2">
+                                        <InputNumber className="flex-1" min={24} max={120} step={4} value={fontSize} onChange={(value) => setFontSize(value ?? 60)} disabled={!subtitleEnabled} />
+                                        <InputNumber className="flex-1" min={0} max={4} step={0.5} value={strokeWidth} onChange={(value) => setStrokeWidth(value ?? 1.5)} disabled={!subtitleEnabled} />
+                                    </div>
+                                </Field>
+                            </div>
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">文字色</span>
+                                    <ColorPicker size="small" value={textForeColor} onChange={(color) => setTextForeColor(hexOf(color))} disabled={!subtitleEnabled} />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">描边色</span>
+                                    <ColorPicker size="small" value={strokeColor} onChange={(color) => setStrokeColor(hexOf(color))} disabled={!subtitleEnabled} />
+                                </div>
+                            </div>
+                        </FormSection>
                     </div>
 
-                    {sectionTitle("字幕")}
-                    <div className="flex items-center justify-between">
-                        <Typography.Text type="secondary" className="text-xs">启用字幕</Typography.Text>
-                        <Switch size="small" checked={subtitleEnabled} onChange={(checked) => setSubtitleEnabled(checked)} />
-                    </div>
-                    <div>
-                        <Typography.Text type="secondary" className="mb-1 block text-xs">位置</Typography.Text>
-                        <Segmented className="flex-1" size="small" options={SUBTITLE_POSITIONS} value={subtitlePosition} onChange={(value) => setSubtitlePosition(value as string)} disabled={!subtitleEnabled} />
-                    </div>
-                    {subtitleEnabled && subtitlePosition === "custom" && (
-                        <div>
-                            <Typography.Text type="secondary" className="mb-1 block text-xs">自定义位置 {customPosition}%</Typography.Text>
-                            <Slider min={0} max={100} step={1} value={customPosition} onChange={setCustomPosition} />
-                        </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <Typography.Text type="secondary" className="mb-1 block text-xs">字体</Typography.Text>
-                            <Select className="w-full" size="small" value={fontName} onChange={setFontName} options={fonts.map((name) => ({ label: name.replace(/\.(ttf|ttc|otf)$/i, ""), value: name }))} disabled={!subtitleEnabled} />
-                        </div>
-                        <div>
-                            <Typography.Text type="secondary" className="mb-1 block text-xs">字号 / 描边宽</Typography.Text>
-                            <div className="flex gap-2">
-                                <InputNumber className="flex-1" size="small" min={24} max={120} step={4} value={fontSize} onChange={(value) => setFontSize(value ?? 60)} disabled={!subtitleEnabled} />
-                                <InputNumber className="flex-1" size="small" min={0} max={4} step={0.5} value={strokeWidth} onChange={(value) => setStrokeWidth(value ?? 1.5)} disabled={!subtitleEnabled} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <Typography.Text type="secondary" className="text-xs">文字色</Typography.Text>
-                            <ColorPicker size="small" value={textForeColor} onChange={(color) => setTextForeColor(hexOf(color))} disabled={!subtitleEnabled} />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Typography.Text type="secondary" className="text-xs">描边色</Typography.Text>
-                            <ColorPicker size="small" value={strokeColor} onChange={(color) => setStrokeColor(hexOf(color))} disabled={!subtitleEnabled} />
-                        </div>
-                    </div>
-
-                    <Button type="primary" icon={submitting ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />} loading={submitting} disabled={health !== "up" || !localSkuId || !localCategoryIds.length || !localTotal || localLoading || !!localError} onClick={onSubmit}>
-                        {health === "up" ? "分析文案并匹配画面" : "等待引擎启动"}
-                    </Button>
-                </Card>
+                    <footer className="border-t border-border bg-card p-4">
+                        <Button type="primary" size="large" block icon={submitting ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />} loading={submitting} disabled={health !== "up" || !localSkuId || !localCategoryIds.length || !localTotal || localLoading || !!localError} onClick={onSubmit}>
+                            {health === "up" ? "分析文案并匹配画面" : "等待引擎启动"}
+                        </Button>
+                    </footer>
+                </aside>
 
                 {/* 右侧：最近的剪辑方案 */}
-                <div className="min-w-0 flex-1 overflow-y-auto pr-1">
+                <section className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
+                    <div className="mb-4 flex items-center justify-between">
+                        <h2 className="text-sm font-semibold tracking-tight">最近的剪辑方案</h2>
+                        {plans.length > 0 && <span className="text-xs text-muted-foreground">共 {plans.length} 条</span>}
+                    </div>
                     {plans.length === 0 ? (
-                        <Empty className="mt-16" description="还没有剪辑方案，左侧粘贴文案开始匹配画面" />
+                        <div className="mt-24 flex flex-col items-center gap-2.5 text-center">
+                            <span className={`grid size-12 place-items-center rounded-xl ${AMBER_TONE}`}><Film className="size-6" /></span>
+                            <p className="text-sm font-medium">还没有剪辑方案</p>
+                            <p className="text-xs text-muted-foreground">左侧粘贴文案，系统将按语义匹配画面</p>
+                        </div>
                     ) : (
                         <div className="flex flex-col gap-3">
                             {plans.map((plan) => {
-                                const meta = planStatusMeta[plan.status] ?? { label: plan.status, color: "default" };
+                                const meta = planStatusMeta[plan.status] ?? { label: plan.status, tone: "muted" as StatusTone };
                                 const script = typeof plan.input?.script === "string" ? plan.input.script : "";
                                 return (
-                                    <Card key={plan.id} size="small" className="cursor-pointer" onClick={() => navigate(`/auto-video/plans/${plan.id}`)}>
-                                        <div className="flex items-center gap-2">
-                                            <Tag color={meta.color}>{meta.label}</Tag>
-                                            <Typography.Text strong ellipsis className="flex-1">
+                                    <button key={plan.id} type="button" className="w-full rounded-xl border border-border bg-card p-4 text-left transition hover:border-primary/40 hover:shadow-sm" onClick={() => navigate(`/auto-video/plans/${plan.id}`)}>
+                                        <div className="flex items-center gap-2.5">
+                                            <StatusBadge tone={meta.tone} label={meta.label} pulse={plan.status === "queued"} />
+                                            <span className="min-w-0 flex-1 truncate text-sm font-medium">
                                                 {script.slice(0, 60) || plan.id.slice(0, 8)}
-                                            </Typography.Text>
-                                            <Typography.Text type="secondary" className="text-xs">{new Date(plan.createdAt).toLocaleString()}</Typography.Text>
+                                            </span>
+                                            <span className="shrink-0 text-xs text-muted-foreground">{new Date(plan.createdAt).toLocaleString()}</span>
                                         </div>
                                         {plan.error && (
-                                            <Typography.Paragraph type="danger" className="mt-2 mb-0 text-xs">{plan.error}</Typography.Paragraph>
+                                            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{plan.error}</p>
                                         )}
-                                    </Card>
+                                    </button>
                                 );
                             })}
                         </div>
                     )}
-                </div>
+                </section>
             </div>
         </div>
     );

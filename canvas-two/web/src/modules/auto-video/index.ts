@@ -15,6 +15,7 @@ registerModule({
             children: [
                 { key: "auto-video-workbench", label: "剪辑工作台", path: "/auto-video" },
                 { key: "auto-video-materials", label: "本地素材库", path: "/auto-video/materials" },
+                { key: "auto-video-search", label: "画面查询", path: "/auto-video/search" },
                 { key: "auto-video-plans", label: "本地剪辑方案", path: "/auto-video/plans" },
                 { key: "auto-video-admin", label: "管理设置", path: "/auto-video/admin" },
             ],
@@ -23,6 +24,7 @@ registerModule({
     routes: [
         { path: "/auto-video", Component: lazy(() => import("./pages/auto-video")) },
         { path: "/auto-video/materials", Component: lazy(() => import("./pages/materials")) },
+        { path: "/auto-video/search", Component: lazy(() => import("./pages/search")) },
         { path: "/auto-video/plans", Component: lazy(() => import("./pages/plans")) },
         { path: "/auto-video/plans/:id", Component: lazy(() => import("./pages/plans")) },
         { path: "/auto-video/admin", Component: lazy(() => import("./pages/admin")) },

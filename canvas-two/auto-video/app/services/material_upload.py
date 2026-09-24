@@ -128,9 +128,19 @@ def find_material_file(file_key: str) -> str:
     if not safe_key or safe_key in {".", ".."}:
         return ""
     for directory in material_search_dirs():
-        path = os.path.join(directory, safe_key)
-        if os.path.isfile(path):
-            return path
+        direct = os.path.join(directory, safe_key)
+        if os.path.isfile(direct):
+            return direct
+        # 新上传素材按货号分目录存放（<根>/<货号>/<fileKey>），
+        # 历史扁平文件仍直接在根目录命中；只下探一级，避免整树扫描。
+        try:
+            for entry in os.scandir(directory):
+                if entry.is_dir():
+                    nested = os.path.join(entry.path, safe_key)
+                    if os.path.isfile(nested):
+                        return nested
+        except OSError:
+            continue
     return ""
 
 
@@ -295,9 +305,10 @@ def _validate_video(
 
 
 def _stage_material_upload(
-    filename: str, source: BinaryIO
+    filename: str, source: BinaryIO, folder: str = ""
 ) -> tuple[str, Literal["video", "image"], str, int]:
     safe_name = sanitize_material_filename(filename)
+    safe_folder = sanitize_material_folder(folder)
     material_kind = _material_kind(safe_name)
     maximum_bytes = (
         MAX_VIDEO_MATERIAL_UPLOAD_BYTES
@@ -308,6 +319,9 @@ def _stage_material_upload(
 
     try:
         target_dir = uploaded_material_dir(create=True)
+        if safe_folder:
+            target_dir = os.path.join(target_dir, safe_folder)
+            os.makedirs(target_dir, exist_ok=True)
     except OSError as exc:
         raise MaterialServiceError("failed to prepare local material storage") from exc
 
@@ -358,10 +372,29 @@ def _stage_material_upload(
             pass
 
 
-def save_material_upload(filename: str, source: BinaryIO) -> str:
+def sanitize_material_folder(folder: str) -> str:
+    """货号子目录名：单段、无路径分隔符、无非法/保留字符；空值表示直接存根目录。"""
+    name = (folder or "").strip()
+    if not name:
+        return ""
+    if (
+        len(name) > 80
+        or "/" in name
+        or "\\" in name
+        or any(character in _UNSAFE_FILENAME_CHARACTERS for character in name)
+        or any(character in _WINDOWS_INVALID_FILENAME_CHARS for character in name)
+    ):
+        raise MaterialUploadError("invalid material folder name")
+    windows_basename = name.split(".", 1)[0].rstrip(" .").upper()
+    if windows_basename in _WINDOWS_RESERVED_FILENAMES:
+        raise MaterialUploadError("invalid material folder name")
+    return name
+
+
+def save_material_upload(filename: str, source: BinaryIO, folder: str = "") -> str:
     """Validate and atomically persist an uploaded local video or image."""
     safe_name, material_kind, temp_path, total_bytes = _stage_material_upload(
-        filename, source
+        filename, source, folder
     )
     extension = Path(safe_name).suffix.lower()
     stored_name = f"{uuid4().hex}{extension}"

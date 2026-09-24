@@ -1,11 +1,11 @@
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 from fastapi import Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from app.controllers import base
 from app.controllers.v1.base import new_router
-from app.services import semantic
+from app.services import jianying, semantic
 
 router = new_router(dependencies=[Depends(base.verify_token)])
 
@@ -26,6 +26,8 @@ class Shot(BaseModel):
     sourceEnd: float = Field(gt=0, allow_inf_nan=False)
     speed: float = Field(ge=.8, le=1)
     frames: int = Field(gt=0)
+    # 该镜头与前一个镜头之间接缝的转场；None 跟随方案级 video_transition。
+    transition: Optional[Literal["none", "fade", "slide_left", "slide_right", "slide_up", "wipe_left", "circle_open", "radial", "pixelize", "hblur", "shuffle"]] = None
 
 class Unit(BaseModel):
     text: str
@@ -35,6 +37,7 @@ class Unit(BaseModel):
 class RenderOptions(BaseModel):
     video_aspect: Literal["9:16", "16:9", "1:1"] = "9:16"
     video_fit_mode: Literal["cover", "contain"] = "cover"
+    video_transition: Literal["none", "fade", "slide_left", "slide_right", "slide_up", "wipe_left", "circle_open", "radial", "pixelize", "hblur", "shuffle"] = "none"
     subtitle_enabled: bool = True
     subtitle_position: Literal["top", "bottom", "center", "custom", "two_thirds_bottom"] = "bottom"
     font_name: str = Field(default="MicrosoftYaHeiBold.ttc", max_length=255)
@@ -55,6 +58,24 @@ class Render(BaseModel):
     units: list[Unit] = Field(min_length=1, max_length=300)
     options: RenderOptions
 
+class JianYingEntry(BaseModel):
+    type: Literal["shot", "gap"]
+    startFrame: int = Field(ge=0)
+    frames: int = Field(gt=0)
+    fileKey: Optional[str] = None
+    sourceStart: float = 0
+    sourceEnd: float = 0
+
+class JianYingExport(BaseModel):
+    requestId: UUID
+    audioKey: UUID
+    entries: list[JianYingEntry] = Field(min_length=1)
+    units: list[Unit]
+    options: RenderOptions
+    name: str = Field(min_length=1, max_length=80)
+    folder: str = Field(min_length=1, max_length=300)
+    pack_materials: bool = True
+
 @router.post("/semantic/probe")
 def probe(body: Probe):
     return semantic.probe(body.fileKey)
@@ -66,6 +87,10 @@ def audio(body: Audio):
 @router.post("/semantic/render")
 def render(body: Render):
     return semantic.render(body.model_dump(mode="json"))
+
+@router.post("/semantic/jianying")
+def export_jianying(body: JianYingExport):
+    return jianying.export_draft(body.model_dump(mode="json"))
 
 @router.get("/semantic/artifacts/{key}/{name}")
 def artifact(key: UUID, name: Literal["audio.wav", "output.mp4"]):

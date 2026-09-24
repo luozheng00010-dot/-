@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { App, Button, Empty, Input, Popconfirm, Spin, Tooltip } from "antd";
-import { ArrowDownToLine, Bot, FileText, Library, MessageSquare, Pencil, Plus, SendHorizonal, ThumbsDown, ThumbsUp, Trash2, User } from "lucide-react";
+import { App, Button, Input, Popconfirm, Spin, Tooltip } from "antd";
+import { ArrowDownToLine, Bot, FileText, Library, MessageSquare, PanelLeft, Pencil, Plus, SendHorizonal, ThumbsDown, ThumbsUp, Trash2, User } from "lucide-react";
 import { createKbConversation, deleteKbConversation, getKbConversation, listKbConversations, renameKbConversation, sendKbFeedback, streamKbMessage } from "../api";
 import { KbMarkdown } from "../components/bits";
 import type { KbCitation, KbConversation, KbMessage } from "../types";
@@ -151,15 +151,15 @@ export default function KnowledgeChatPage() {
 
     return (
         <main className="flex h-full bg-background text-foreground">
-            <aside className={`shrink-0 flex-col border-r border-border ${sidebarOpen ? "flex w-60" : "hidden"}`}>
-                <div className="flex items-center gap-2 border-b border-border px-3 py-3">
+            <aside className={`shrink-0 flex-col border-r border-border ${sidebarOpen ? "flex w-64" : "hidden"}`}>
+                <div className="border-b border-border px-3 py-3">
                     <Button type="primary" icon={<Plus className="size-4" />} className="flex-1" onClick={newChat}>新会话</Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2">
                     {conversations.map((item) => (
                         <div
                             key={item.id}
-                            className={`group mb-1 flex cursor-pointer items-center gap-1 rounded-md px-2 py-2 text-sm transition hover:bg-muted ${item.id === id ? "bg-muted font-medium" : ""}`}
+                            className={`group mb-1 flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition hover:bg-muted ${item.id === id ? "bg-muted font-medium" : "text-muted-foreground hover:text-foreground"}`}
                             onClick={() => navigate(`/knowledge/chat/${item.id}`)}
                         >
                             <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
@@ -214,28 +214,32 @@ export default function KnowledgeChatPage() {
 
             <section className="flex min-w-0 flex-1 flex-col">
                 <header className="flex items-center gap-3 border-b border-border px-4 py-3">
-                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Button type="text" size="small" icon={<PanelLeft className="size-4" />} onClick={() => setSidebarOpen((open) => !open)} />
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
                         <Library className="size-4" />
                     </span>
                     <div className="min-w-0">
                         <h1 className="truncate text-sm font-semibold">{activeConversation?.title || "知识库 AI 问答"}</h1>
                         <p className="text-xs text-muted-foreground">基于全员沉淀的经验综合生成，答案附引用来源</p>
                     </div>
-                    <Button className="ml-auto" size="small" onClick={() => setSidebarOpen((open) => !open)}>{sidebarOpen ? "收起列表" : "会话列表"}</Button>
                 </header>
 
                 <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
                     <Spin spinning={loadingConv}>
                         {!messages.length && !loadingConv ? (
-                            <Empty description="直接向知识库提问，例如：客户退款的完整流程是什么？" className="py-24" />
+                            <div className="flex h-full flex-col items-center justify-center gap-2.5 text-center">
+                                <span className="grid size-12 place-items-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400"><Bot className="size-6" /></span>
+                                <p className="text-sm font-medium">知识库 AI 问答</p>
+                                <p className="text-xs text-muted-foreground">直接向知识库提问，例如：客户退款的完整流程是什么？</p>
+                            </div>
                         ) : (
-                            <ul className="mx-auto max-w-3xl space-y-4">
+                            <ul className="mx-auto max-w-3xl space-y-5">
                                 {messages.map((item) => (
                                     <li key={item.id} className={`flex gap-3 ${item.role === "user" ? "justify-end" : ""}`}>
                                         {item.role === "assistant" && (
-                                            <span className="mt-1 grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"><Bot className="size-4" /></span>
+                                            <span className="mt-1 grid size-7 shrink-0 place-items-center rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400"><Bot className="size-4" /></span>
                                         )}
-                                        <div className={`min-w-0 max-w-[85%] rounded-lg px-4 py-3 ${item.role === "user" ? "bg-primary text-primary-foreground" : "border border-border bg-card"}`}>
+                                        <div className={`min-w-0 max-w-[85%] rounded-2xl px-4 py-3 ${item.role === "user" ? "rounded-br-md bg-muted" : "rounded-bl-md border border-border bg-card"}`}>
                                             {item.role === "user" ? (
                                                 <p className="whitespace-pre-wrap text-sm leading-6">{item.content}</p>
                                             ) : (
@@ -247,12 +251,12 @@ export default function KnowledgeChatPage() {
                                                     )}
                                                     {item.streaming && item.content && <span className="mt-1 inline-block h-4 w-2 animate-pulse bg-primary align-text-bottom" />}
                                                     {!!item.citations?.length && (
-                                                        <div className="mt-3 border-t border-border pt-2">
+                                                        <div className="mt-3 border-t border-border pt-2.5">
                                                             <p className="mb-1.5 flex items-center gap-1 text-xs text-muted-foreground"><FileText className="size-3.5" />引用来源</p>
                                                             <div className="flex flex-wrap gap-1.5">
                                                                 {item.citations.map((citation: KbCitation, index) => (
                                                                     <Tooltip key={citation.chunkId} title={`${citation.heading ? `# ${citation.heading} — ` : ""}${citation.excerpt}`}>
-                                                                        <Link to={`/knowledge/posts/${citation.postId}`} className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary">
+                                                                        <Link to={`/knowledge/posts/${citation.postId}`} className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground transition hover:border-primary hover:text-primary">
                                                                             <span className="font-medium">[{index + 1}]</span>
                                                                             <span className="max-w-40 truncate">{citation.title}</span>
                                                                         </Link>
@@ -284,9 +288,10 @@ export default function KnowledgeChatPage() {
                     </Spin>
                 </div>
 
-                <footer className="border-t border-border px-4 py-3">
-                    <div className="mx-auto flex max-w-3xl items-end gap-2">
+                <footer className="px-4 pb-4 pt-2">
+                    <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm focus-within:border-primary/40">
                         <Input.TextArea
+                            variant="borderless"
                             value={input}
                             onChange={(event) => setInput(event.target.value)}
                             onKeyDown={(event) => {
@@ -298,7 +303,7 @@ export default function KnowledgeChatPage() {
                             placeholder="输入问题，Enter 发送，Shift+Enter 换行"
                             autoSize={{ minRows: 1, maxRows: 6 }}
                         />
-                        <Button type="primary" icon={<SendHorizonal className="size-4" />} loading={asking} disabled={!input.trim()} onClick={() => void ask()}>发送</Button>
+                        <Button type="primary" shape="circle" icon={<SendHorizonal className="size-4" />} loading={asking} disabled={!input.trim()} onClick={() => void ask()} />
                     </div>
                 </footer>
             </section>

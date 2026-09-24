@@ -11,8 +11,60 @@ export const annotationInput = z.object({
     userNotes: z.string().max(500).default(""),
 });
 export type Annotation = z.infer<typeof annotationInput>;
+// 镜头接缝转场效果。方案级 video_transition 是全局默认；镜头上单独设置则覆盖该接缝
+// （"none" 表示这个接缝强制硬切），不设置则跟随全局（含 shuffle 每段随机）。
+export const transitionEffect = z.enum(["none", "fade", "slide_left", "slide_right", "slide_up", "wipe_left", "circle_open", "radial", "pixelize", "hblur", "shuffle"]);
+export type TransitionEffect = z.infer<typeof transitionEffect>;
+// 模型偶尔把数组字段写成逗号分隔的字符串，先按常见分隔符拆回数组再进校验，
+// 避免一次格式抖动直接把任务判死。支持对象和对象数组。
+export function coerceStringArrays(value: unknown, keys: string[]): unknown {
+    if (Array.isArray(value)) return value.map((entry) => coerceStringArrays(entry, keys));
+    if (!value || typeof value !== "object") return value;
+    const record = { ...(value as Record<string, unknown>) };
+    for (const key of keys) {
+        const field = record[key];
+        if (typeof field === "string") record[key] = field.split(/[,，、;；|]/).map((entry) => entry.trim()).filter(Boolean);
+    }
+    return record;
+}
+export function normalizeAnnotation(value: unknown): unknown {
+    return coerceStringArrays(value, ["parts", "actions", "tags", "colors", "warnings"]);
+}
+// 颜色同义词归一：视觉模型对同一颜色常造不同词（橘色/橙色/桔色、玫红/粉色），
+// 检索与匹配都按归一后的标准色名进行。键做子串替换（最长优先），值去重。
+const COLOR_ALIASES: [string, string][] = ([
+    ["橘黄色", "橙"], ["橙黄色", "橙"], ["桔黄色", "橙"], ["橘红色", "橙"], ["桔红色", "橙"], ["橘红", "橙"], ["桔红", "橙"],
+    ["橘色", "橙"], ["桔色", "橙"], ["橙色", "橙"],
+    ["柠檬黄", "黄"], ["鹅黄色", "黄"], ["奶黄色", "黄"], ["明黄色", "黄"], ["土黄色", "黄"], ["鹅黄", "黄"], ["奶黄", "黄"], ["明黄", "黄"], ["土黄", "黄"], ["黄色", "黄"],
+    ["桃粉色", "粉"], ["粉红色", "粉"], ["玫红色", "粉"], ["桃红色", "粉"], ["西瓜红", "红"], ["桃红", "粉"], ["玫红", "粉"], ["粉色", "粉"],
+    ["天蓝色", "蓝"], ["湖蓝色", "蓝"], ["宝蓝色", "蓝"], ["藏蓝色", "蓝"], ["深蓝色", "蓝"], ["浅蓝色", "蓝"], ["淡蓝色", "蓝"],
+    ["天蓝", "蓝"], ["湖蓝", "蓝"], ["宝蓝", "蓝"], ["藏青", "蓝"], ["深蓝", "蓝"], ["浅蓝", "蓝"], ["淡蓝", "蓝"], ["蓝色", "蓝"],
+    ["草绿色", "绿"], ["墨绿色", "绿"], ["浅绿色", "绿"], ["草绿", "绿"], ["墨绿", "绿"], ["浅绿", "绿"], ["绿色", "绿"],
+    ["淡紫色", "紫"], ["浅紫色", "紫"], ["深紫色", "紫"], ["淡紫", "紫"], ["浅紫", "紫"], ["深紫", "紫"], ["紫色", "紫"],
+    ["大红色", "红"], ["深红色", "红"], ["酒红色", "红"], ["浅红色", "红"], ["橘红", "橙"], ["桔红", "橙"], ["大红", "红"], ["深红", "红"], ["酒红", "红"], ["浅红", "红"], ["红色", "红"],
+    ["咖啡色", "棕"], ["卡其色", "棕"], ["褐色", "棕"], ["驼色", "棕"], ["棕色", "棕"],
+    ["银灰色", "灰"], ["浅灰色", "灰"], ["深灰色", "灰"], ["银灰", "灰"], ["浅灰", "灰"], ["深灰", "灰"], ["灰色", "灰"],
+    ["奶油色", "米色"], ["米白色", "米色"], ["杏色", "米色"], ["裸色", "米色"], ["米色", "米色"],
+    ["肉色", "肤色"], ["象牙白", "白"], ["香槟色", "香槟"],
+    ["黑色", "黑"], ["白色", "白"], ["金色", "金"], ["银色", "银"],
+] as [string, string][]).sort((a, b) => b[0].length - a[0].length);
+
+export function normalizeColors(colors: string[]): string[] {
+    const out: string[] = [];
+    for (const raw of colors) {
+        if (typeof raw !== "string") continue;
+        let value = raw;
+        for (const [alias, canonical] of COLOR_ALIASES) {
+            if (value.includes(alias)) value = value.split(alias).join(canonical);
+        }
+        if (value.trim() && !out.includes(value)) out.push(value);
+    }
+    return out;
+}
 export const renderOptions = z.object({
     video_aspect: z.enum(["9:16", "16:9", "1:1"]).default("9:16"), video_fit_mode: z.enum(["cover", "contain"]).default("cover"),
+    // 镜头拼接转场：交叉融合（xfade），默认无转场（硬切，流拷贝拼接）。固定 0.3 秒。
+    video_transition: transitionEffect.default("none"),
     subtitle_enabled: z.boolean().default(true), subtitle_position: z.enum(["top", "bottom", "center", "custom", "two_thirds_bottom"]).default("bottom"),
     font_name: z.string().regex(/^[^/\\:\x00]+\.(ttf|ttc|otf)$/i).default("MicrosoftYaHeiBold.ttc"), font_size: z.number().int().min(24).max(120).default(60),
     text_fore_color: z.string().regex(/^#[a-f\d]{6}$/i).default("#FFFFFF"), stroke_color: z.string().regex(/^#[a-f\d]{6}$/i).default("#000000"),
@@ -28,11 +80,11 @@ export const planInput = z.object({
 });
 export type PlanInput = z.infer<typeof planInput>;
 export type Candidate = { id: string; fileKey: string; fileName: string; duration: number; width: number; height: number; revision: number; annotation: Annotation; grade: "strong" | "uncertain" | "none"; relevance: number; fitScore: number; reason: string; missing: string[] };
-export type Shot = { materialId: string; sourceStart: number; sourceEnd: number; speed: number; frames: number; manual: boolean };
+export type Shot = { materialId: string; sourceStart: number; sourceEnd: number; speed: number; frames: number; manual: boolean; transition?: TransitionEffect };
 export type Unit = { start: number; end: number; text: string; query: string; tags: string[]; evidence: string[]; generic: boolean; startFrame: number; endFrame: number; candidates: Candidate[] };
 export type UnitEdit = { shots: Shot[]; confirmed: boolean; allowRepeat: boolean };
 export type PlanDocument = { audioKey: string; duration: number; fps: number; units: Unit[]; variants: UnitEdit[][]; options: z.infer<typeof renderOptions>; embeddingKey: string };
-export const shotInput = z.object({ materialId: z.string().uuid(), sourceStart: z.number().finite().min(0), sourceEnd: z.number().finite().positive(), speed: z.number().min(0.8).max(1), manual: z.boolean().default(true) });
+export const shotInput = z.object({ materialId: z.string().uuid(), sourceStart: z.number().finite().min(0), sourceEnd: z.number().finite().positive(), speed: z.number().min(0.8).max(1), manual: z.boolean().default(true), transition: transitionEffect.optional() });
 export const editInput = z.object({ variant: z.number().int().min(0).max(4), unit: z.number().int().min(0), shots: z.array(shotInput).max(200), confirmed: z.boolean(), allowRepeat: z.boolean() });
 export const fail = (message: string, status = 400) => Object.assign(new Error(message), { status });
 

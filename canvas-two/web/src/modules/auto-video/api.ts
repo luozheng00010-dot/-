@@ -1,7 +1,7 @@
 import { apiUrl } from "@/lib/app-path";
 import { ApiError, jsonBody, serverApi } from "@/services/server-api";
 
-export interface AutoVideoModelSettings { channelId: string | null; model: string | null; visionChannelId?: string | null; visionModel?: string | null; embedChannelId?: string | null; embedModel?: string | null; visionVerified?: string | null; storageDir?: string | null; storageDefaultDir?: string | null }
+export interface AutoVideoModelSettings { channelId: string | null; model: string | null; visionChannelId?: string | null; visionModel?: string | null; embedChannelId?: string | null; embedModel?: string | null; visionVerified?: string | null; storageDir?: string | null; storageDefaultDir?: string | null; jianyingDir?: string | null }
 export interface AutoVideoModelChannel { id: string; name: string; apiFormat: string; models: string[] }
 export const getAutoVideoSettings = () => serverApi<{ settings: AutoVideoModelSettings; channels: AutoVideoModelChannel[] }>("/api/auto-video/admin/settings");
 export const saveAutoVideoSettings = (input: AutoVideoModelSettings) => serverApi<{ settings: AutoVideoModelSettings }>("/api/auto-video/admin/settings", { method: "PUT", ...jsonBody(input) });

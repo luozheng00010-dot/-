@@ -65,6 +65,7 @@ model AutoVideoSetting {
     embedChannelId String? @map("embed_channel_id")
     embedModel String? @map("embed_model")
     storageDir String? @map("storage_dir")
+    jianyingDir String? @map("jianying_dir")
     visionVerified String? @map("vision_verified")
   updatedAt DateTime @updatedAt @map("updated_at")
   @@map("auto_video_settings")

@@ -138,12 +138,13 @@ router.post("/", async (req, res, next) => {
         const ownerId = input.ownerId || req.user!.id;
         await assertAccess(req.user!, ownerId, "edit");
         const duplicate = await prisma.imageGenerationTask.findUnique({ where: { ownerId_clientRequestId: { ownerId, clientRequestId: input.clientRequestId } } });
-        if (duplicate) return res.status(200).json({ task: await taskResponse(duplicate) });
         const canvasId = typeof input.context?.canvasId === "string" ? input.context.canvasId : "";
         if (canvasId) {
             const canvas = await prisma.canvasProject.findUniqueOrThrow({ where: { id: canvasId } });
             await assertAccess(req.user!, canvas.ownerId, "edit");
         }
+        // 画布访问校验通过后再返回幂等结果，避免无画布权限的请求探知任务存在性。
+        if (duplicate) return res.status(200).json({ task: await taskResponse(duplicate) });
         const productId = productIdFromContext(input.context);
         if (productId) {
             if (input.count !== 1) throw Object.assign(new Error("商品图任务只允许生成 1 张合成图"), { status: 400 });
